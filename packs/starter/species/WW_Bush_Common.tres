@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ForestSpecies" format=3]
+
+[ext_resource type="Script" path="res://addons/wuifwoud/species/forest_species.gd" id="1_0i2qg"]
+
+[resource]
+script = ExtResource("1_0i2qg")
+id = "WW_Bush_Common"
+display_name = "Bush Common"
+kind = "bush"
+trunk_radius = 0.0
+alpha_cut = 0.2
+mesh = "res://addons/wuifwoud/packs/starter/meshes/Bush_Common.gltf"
+foliage_materials = PackedStringArray("Leaves_TwistedTree")
+foliage_albedo = "res://addons/wuifwoud/packs/starter/meshes/Leaves_TwistedTree_C.png"

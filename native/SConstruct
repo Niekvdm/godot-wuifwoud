@@ -1,0 +1,29 @@
+#!/usr/bin/env python
+# Copyright (c) 2026 Digitzone
+# SPDX-License-Identifier: MIT
+# wuifwoud_core: the forest addon's native core: the map summary, the scatter, the place and the far forest's build, as
+# stateless kernels the addon's GDScript calls one job at a time. It needs godot-cpp at native/godot-cpp (a checkout or
+# a link; git ignores it) and builds it against the engine's own API:
+#
+#   scons target=template_debug   custom_api_file=<extension_api.json>
+#   scons target=template_release custom_api_file=<extension_api.json>
+#
+# ALWAYS the same custom_api_file as the host's other libraries: a shared godot-cpp built against another API
+# regenerates its gen/ for every project that links it.
+#
+# -ffp-contract=off: no fused multiply-add, so the same source gives the same floats on every CPU.
+#
+# Output: bin/libwuifwoud_core.<platform>.<target>.<arch>.so. Install it into ../bin by rename, never by copying over
+# the old one: an open editor has that file mapped.
+env = SConscript("godot-cpp/SConstruct")
+env.Append(CPPPATH=["src/"])
+env.Append(CCFLAGS=["-ffp-contract=off"])
+
+sources = Glob("src/*.cpp") + Glob("src/*/*.cpp")
+
+library = env.SharedLibrary(
+    "bin/libwuifwoud_core{}{}".format(env["suffix"], env["SHLIBSUFFIX"]),
+    source=sources,
+)
+
+Default(library)

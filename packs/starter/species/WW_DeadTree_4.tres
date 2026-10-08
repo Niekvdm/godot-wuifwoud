@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ForestSpecies" format=3]
+
+[ext_resource type="Script" path="res://addons/wuifwoud/species/forest_species.gd" id="1_cueg8"]
+
+[resource]
+script = ExtResource("1_cueg8")
+id = "WW_DeadTree_4"
+display_name = "DeadTree 4"
+trunk_radius = 0.6
+mesh = "res://addons/wuifwoud/packs/starter/meshes/DeadTree_4.gltf"
+foliage_materials = PackedStringArray()
+bark_albedo = "res://addons/wuifwoud/packs/starter/meshes/Bark_DeadTree.png"
+bark_normal = "res://addons/wuifwoud/packs/starter/meshes/Bark_DeadTree_Normal.png"

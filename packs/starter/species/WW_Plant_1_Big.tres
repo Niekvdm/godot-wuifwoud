@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ForestSpecies" format=3]
+
+[ext_resource type="Script" path="res://addons/wuifwoud/species/forest_species.gd" id="1_gtbom"]
+
+[resource]
+script = ExtResource("1_gtbom")
+id = "WW_Plant_1_Big"
+display_name = "Plant 1 Big"
+kind = "bush"
+trunk_radius = 0.0
+alpha_cut = 0.2
+mesh = "res://addons/wuifwoud/packs/starter/meshes/Plant_1_Big.gltf"
+foliage_materials = PackedStringArray("Leaves")
+foliage_albedo = "res://addons/wuifwoud/packs/starter/meshes/Leaves.png"

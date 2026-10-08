@@ -1,0 +1,422 @@
+{
+  "bake": {
+    "cols": 8,
+    "gbuffer": true,
+    "grid": 8,
+    "projection": "hemi_oct",
+    "render_tile": 512,
+    "rows": 8,
+    "tile": 128,
+    "views": 64
+  },
+  "species": {
+    "WW_Bush_Common": {
+      "crown_colour": [
+        0.28030329942703247,
+        0.005407251883298159,
+        0.003970000892877579
+      ],
+      "h": 1.5817856788635254,
+      "imports": {
+        "res://addons/wuifwoud/packs/starter/meshes/Bush_Common.bin": "",
+        "res://addons/wuifwoud/packs/starter/meshes/Bush_Common.gltf": "475f445f0d055a89e25827e6644719e8",
+        "res://addons/wuifwoud/packs/starter/meshes/Leaves_TwistedTree_C.png": "7256ffdde33f9d884d47fffe4ec9a5f6"
+      },
+      "pack": "starter.tres",
+      "prep_version": 1,
+      "settings": "8414812ca296de5b865369d7f0bb922e",
+      "sources": {
+        "res://addons/wuifwoud/packs/starter/meshes/Bush_Common.bin": {
+          "md5": "10b92b0078811fcab882582efecc6e56",
+          "mtime": 1722110970,
+          "size": 91800
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Bush_Common.gltf": {
+          "md5": "d2de67e7fef13c8fd7a649d660d64a50",
+          "mtime": 1722110970,
+          "size": 2101
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Leaves_TwistedTree_C.png": {
+          "md5": "d97ec3308cc6d22d4a85cef33c34deee",
+          "mtime": 1721489074,
+          "size": 70353
+        }
+      },
+      "span": 2.0223919272422792,
+      "w": 1.9827371835708618,
+      "warnings": [
+        "WW_Bush_Common ships no authored LOD chain: indirect bins all draw LOD0 (900 tri)"
+      ]
+    },
+    "WW_CommonTree_3": {
+      "crown_colour": [
+        0.10055849701166153,
+        0.13650839030742645,
+        0.0038560449611395597
+      ],
+      "h": 9.425189971923828,
+      "imports": {
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png": "7256ffdde33f9d884d47fffe4ec9a5f6",
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png": "7256ffdde33f9d884d47fffe4ec9a5f6",
+        "res://addons/wuifwoud/packs/starter/meshes/CommonTree_3.bin": "",
+        "res://addons/wuifwoud/packs/starter/meshes/CommonTree_3.gltf": "475f445f0d055a89e25827e6644719e8",
+        "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png": "7256ffdde33f9d884d47fffe4ec9a5f6"
+      },
+      "pack": "starter.tres",
+      "prep_version": 1,
+      "settings": "1f2d3c4d786efe239f9d04a1b6f2b581",
+      "sources": {
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png": {
+          "md5": "67b17974d8066394d8e1e25eaa83a6df",
+          "mtime": 1791402187,
+          "size": 1024360
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png": {
+          "md5": "8fefd17af159857beadd9df19439b2a8",
+          "mtime": 1791402189,
+          "size": 1117297
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/CommonTree_3.bin": {
+          "md5": "c141fc8e4c3ef5e90f74fe73cee587d2",
+          "mtime": 1721488288,
+          "size": 296984
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/CommonTree_3.gltf": {
+          "md5": "218f7f9d1d6987ea03f87d73e11c228e",
+          "mtime": 1721488288,
+          "size": 3864
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png": {
+          "md5": "4761d9780e45a5ae95d02b0138a467c4",
+          "mtime": 1721830306,
+          "size": 158796
+        }
+      },
+      "span": 9.613693771362305,
+      "w": 4.360222816467285,
+      "warnings": [
+        "WW_CommonTree_3 ships no authored LOD chain: indirect bins all draw LOD0 (3505 tri)"
+      ]
+    },
+    "WW_CommonTree_4": {
+      "crown_colour": [
+        0.13251875340938568,
+        0.12640202045440674,
+        0.010154113173484802
+      ],
+      "h": 9.43838119506836,
+      "imports": {
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png": "7256ffdde33f9d884d47fffe4ec9a5f6",
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png": "7256ffdde33f9d884d47fffe4ec9a5f6",
+        "res://addons/wuifwoud/packs/starter/meshes/CommonTree_4.bin": "",
+        "res://addons/wuifwoud/packs/starter/meshes/CommonTree_4.gltf": "475f445f0d055a89e25827e6644719e8",
+        "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png": "7256ffdde33f9d884d47fffe4ec9a5f6"
+      },
+      "pack": "starter.tres",
+      "prep_version": 1,
+      "settings": "1f2d3c4d786efe239f9d04a1b6f2b581",
+      "sources": {
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png": {
+          "md5": "67b17974d8066394d8e1e25eaa83a6df",
+          "mtime": 1791402187,
+          "size": 1024360
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png": {
+          "md5": "8fefd17af159857beadd9df19439b2a8",
+          "mtime": 1791402189,
+          "size": 1117297
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/CommonTree_4.bin": {
+          "md5": "d946bd0db52f16c58c8eb37df32cd837",
+          "mtime": 1721488276,
+          "size": 307596
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/CommonTree_4.gltf": {
+          "md5": "8b2c80c90dcef8fe235b1c503652e761",
+          "mtime": 1721488276,
+          "size": 3865
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png": {
+          "md5": "4761d9780e45a5ae95d02b0138a467c4",
+          "mtime": 1721830306,
+          "size": 158796
+        }
+      },
+      "span": 9.627148818969726,
+      "w": 4.1592206954956055,
+      "warnings": [
+        "WW_CommonTree_4 ships no authored LOD chain: indirect bins all draw LOD0 (4066 tri)"
+      ]
+    },
+    "WW_CommonTree_5": {
+      "crown_colour": [
+        0.10845579952001572,
+        0.1394411027431488,
+        0.004683597479015589
+      ],
+      "h": 7.006239891052246,
+      "imports": {
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png": "7256ffdde33f9d884d47fffe4ec9a5f6",
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png": "7256ffdde33f9d884d47fffe4ec9a5f6",
+        "res://addons/wuifwoud/packs/starter/meshes/CommonTree_5.bin": "",
+        "res://addons/wuifwoud/packs/starter/meshes/CommonTree_5.gltf": "475f445f0d055a89e25827e6644719e8",
+        "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png": "7256ffdde33f9d884d47fffe4ec9a5f6"
+      },
+      "pack": "starter.tres",
+      "prep_version": 1,
+      "settings": "1f2d3c4d786efe239f9d04a1b6f2b581",
+      "sources": {
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png": {
+          "md5": "67b17974d8066394d8e1e25eaa83a6df",
+          "mtime": 1791402187,
+          "size": 1024360
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png": {
+          "md5": "8fefd17af159857beadd9df19439b2a8",
+          "mtime": 1791402189,
+          "size": 1117297
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/CommonTree_5.bin": {
+          "md5": "4fc766a0b88a400a3abc34b2e17ed4e1",
+          "mtime": 1721488264,
+          "size": 252996
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/CommonTree_5.gltf": {
+          "md5": "839e2f218ad724a151f9b87b6ccfe320",
+          "mtime": 1721488264,
+          "size": 3860
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png": {
+          "md5": "4761d9780e45a5ae95d02b0138a467c4",
+          "mtime": 1721830306,
+          "size": 158796
+        }
+      },
+      "span": 7.146364688873291,
+      "w": 4.324895858764648,
+      "warnings": [
+        "WW_CommonTree_5 ships no authored LOD chain: indirect bins all draw LOD0 (3182 tri)"
+      ]
+    },
+    "WW_DeadTree_4": {
+      "crown_colour": [
+        0.0521276593208313,
+        0.04670657962560654,
+        0.05024189129471779
+      ],
+      "h": 12.770977020263672,
+      "imports": {
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_DeadTree.png": "7256ffdde33f9d884d47fffe4ec9a5f6",
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_DeadTree_Normal.png": "7256ffdde33f9d884d47fffe4ec9a5f6",
+        "res://addons/wuifwoud/packs/starter/meshes/DeadTree_4.bin": "",
+        "res://addons/wuifwoud/packs/starter/meshes/DeadTree_4.gltf": "475f445f0d055a89e25827e6644719e8"
+      },
+      "pack": "starter.tres",
+      "prep_version": 1,
+      "settings": "14544e48be092059748879d8d96965e9",
+      "sources": {
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_DeadTree.png": {
+          "md5": "831a3149372abb8b290b8b4a6418f2b3",
+          "mtime": 1791402187,
+          "size": 1105210
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_DeadTree_Normal.png": {
+          "md5": "32a7c605023312662c09d10315c48ae1",
+          "mtime": 1791402188,
+          "size": 1450347
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/DeadTree_4.bin": {
+          "md5": "e7dd8c50f9a82329fd0e18e9abff0e72",
+          "mtime": 1721488362,
+          "size": 401556
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/DeadTree_4.gltf": {
+          "md5": "0e23a5d21034e3c5286543ef5e20b644",
+          "mtime": 1721488362,
+          "size": 2211
+        }
+      },
+      "span": 13.026396560668946,
+      "w": 9.196348190307617,
+      "warnings": [
+        "WW_DeadTree_4 ships no authored LOD chain: indirect bins all draw LOD0 (5702 tri)"
+      ]
+    },
+    "WW_Fern_1": {
+      "crown_colour": [
+        0.0646858885884285,
+        0.18548542261123657,
+        0.013876669108867645
+      ],
+      "h": 0.8402432203292847,
+      "imports": {
+        "res://addons/wuifwoud/packs/starter/meshes/Fern_1.bin": "",
+        "res://addons/wuifwoud/packs/starter/meshes/Fern_1.gltf": "475f445f0d055a89e25827e6644719e8",
+        "res://addons/wuifwoud/packs/starter/meshes/Leaves.png": "7256ffdde33f9d884d47fffe4ec9a5f6"
+      },
+      "pack": "starter.tres",
+      "prep_version": 1,
+      "settings": "31c43529bc5769e10f8d6508a170a9a4",
+      "sources": {
+        "res://addons/wuifwoud/packs/starter/meshes/Fern_1.bin": {
+          "md5": "05decbea32431e32088386b172642d27",
+          "mtime": 1721489572,
+          "size": 11448
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Fern_1.gltf": {
+          "md5": "8eeb57d6e4e03920dcdcc1b2e75fca34",
+          "mtime": 1721586514,
+          "size": 2058
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Leaves.png": {
+          "md5": "3003dbc8643e5d4a7d51d9d7fd9d1477",
+          "mtime": 1721489688,
+          "size": 2586432
+        }
+      },
+      "span": 2.949210834503174,
+      "w": 2.891383171081543,
+      "warnings": [
+        "WW_Fern_1 ships no authored LOD chain: indirect bins all draw LOD0 (288 tri)"
+      ]
+    },
+    "WW_Pine_4": {
+      "crown_colour": [
+        0.032588083297014236,
+        0.07604140043258667,
+        0.0020283882040530443
+      ],
+      "h": 10.236431121826172,
+      "imports": {
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png": "7256ffdde33f9d884d47fffe4ec9a5f6",
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png": "7256ffdde33f9d884d47fffe4ec9a5f6",
+        "res://addons/wuifwoud/packs/starter/meshes/Leaf_Pine_C.png": "7256ffdde33f9d884d47fffe4ec9a5f6",
+        "res://addons/wuifwoud/packs/starter/meshes/Pine_4.bin": "",
+        "res://addons/wuifwoud/packs/starter/meshes/Pine_4.gltf": "475f445f0d055a89e25827e6644719e8"
+      },
+      "pack": "starter.tres",
+      "prep_version": 1,
+      "settings": "95f2e3eb4e2e23447df93ec73470e0ac",
+      "sources": {
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png": {
+          "md5": "67b17974d8066394d8e1e25eaa83a6df",
+          "mtime": 1791402187,
+          "size": 1024360
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png": {
+          "md5": "8fefd17af159857beadd9df19439b2a8",
+          "mtime": 1791402189,
+          "size": 1117297
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Leaf_Pine_C.png": {
+          "md5": "8905d00249da052adc37f5504bd19c0a",
+          "mtime": 1721487892,
+          "size": 70055
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Pine_4.bin": {
+          "md5": "4b94fb5a4ad53e162605672efc3a3a43",
+          "mtime": 1721487868,
+          "size": 254844
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Pine_4.gltf": {
+          "md5": "5666d60260f56e31101ffc9a34ea0c67",
+          "mtime": 1721487868,
+          "size": 3831
+        }
+      },
+      "span": 10.441159744262695,
+      "w": 5.891814708709717,
+      "warnings": [
+        "WW_Pine_4 ships no authored LOD chain: indirect bins all draw LOD0 (3370 tri)"
+      ]
+    },
+    "WW_Pine_5": {
+      "crown_colour": [
+        0.027653498575091362,
+        0.07493695616722107,
+        0.0011916763614863157
+      ],
+      "h": 8.723807334899902,
+      "imports": {
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png": "7256ffdde33f9d884d47fffe4ec9a5f6",
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png": "7256ffdde33f9d884d47fffe4ec9a5f6",
+        "res://addons/wuifwoud/packs/starter/meshes/Leaf_Pine_C.png": "7256ffdde33f9d884d47fffe4ec9a5f6",
+        "res://addons/wuifwoud/packs/starter/meshes/Pine_5.bin": "",
+        "res://addons/wuifwoud/packs/starter/meshes/Pine_5.gltf": "475f445f0d055a89e25827e6644719e8"
+      },
+      "pack": "starter.tres",
+      "prep_version": 1,
+      "settings": "95f2e3eb4e2e23447df93ec73470e0ac",
+      "sources": {
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png": {
+          "md5": "67b17974d8066394d8e1e25eaa83a6df",
+          "mtime": 1791402187,
+          "size": 1024360
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png": {
+          "md5": "8fefd17af159857beadd9df19439b2a8",
+          "mtime": 1791402189,
+          "size": 1117297
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Leaf_Pine_C.png": {
+          "md5": "8905d00249da052adc37f5504bd19c0a",
+          "mtime": 1721487892,
+          "size": 70055
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Pine_5.bin": {
+          "md5": "3948e73cc929c00d66a447615a11c26b",
+          "mtime": 1721487856,
+          "size": 120996
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Pine_5.gltf": {
+          "md5": "ad66c61ab4b9e66e42977d53675a883c",
+          "mtime": 1721487856,
+          "size": 3815
+        }
+      },
+      "span": 8.8982834815979,
+      "w": 7.5568084716796875,
+      "warnings": [
+        "WW_Pine_5 ships no authored LOD chain: indirect bins all draw LOD0 (1646 tri)"
+      ]
+    },
+    "WW_Plant_1_Big": {
+      "crown_colour": [
+        0.18192152678966522,
+        0.23553860187530518,
+        0.006541012320667505
+      ],
+      "h": 2.3477659225463867,
+      "imports": {
+        "res://addons/wuifwoud/packs/starter/meshes/Leaves.png": "7256ffdde33f9d884d47fffe4ec9a5f6",
+        "res://addons/wuifwoud/packs/starter/meshes/Plant_1_Big.bin": "",
+        "res://addons/wuifwoud/packs/starter/meshes/Plant_1_Big.gltf": "475f445f0d055a89e25827e6644719e8"
+      },
+      "pack": "starter.tres",
+      "prep_version": 1,
+      "settings": "31c43529bc5769e10f8d6508a170a9a4",
+      "sources": {
+        "res://addons/wuifwoud/packs/starter/meshes/Leaves.png": {
+          "md5": "3003dbc8643e5d4a7d51d9d7fd9d1477",
+          "mtime": 1721489688,
+          "size": 2586432
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Plant_1_Big.bin": {
+          "md5": "696010885e663070ff784eca034e1a7e",
+          "mtime": 1721489678,
+          "size": 16560
+        },
+        "res://addons/wuifwoud/packs/starter/meshes/Plant_1_Big.gltf": {
+          "md5": "550297447b3085a6fbbb803872d39ff3",
+          "mtime": 1721586588,
+          "size": 2075
+        }
+      },
+      "span": 2.3947212409973146,
+      "w": 2.0729775428771973,
+      "warnings": [
+        "WW_Plant_1_Big ships no authored LOD chain: indirect bins all draw LOD0 (360 tri)"
+      ]
+    }
+  }
+}

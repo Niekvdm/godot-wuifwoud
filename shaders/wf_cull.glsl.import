@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://davukcoytxtq4"
+path="res://.godot/imported/wf_cull.glsl-dc638c3ded9ac3ca4815c60773ed2f42.res"
+
+[deps]
+
+source_file="res://addons/wuifwoud/shaders/wf_cull.glsl"
+dest_files=["res://.godot/imported/wf_cull.glsl-dc638c3ded9ac3ca4815c60773ed2f42.res"]
+
+[params]
+

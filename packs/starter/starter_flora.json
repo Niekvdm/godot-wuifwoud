@@ -1,0 +1,124 @@
+{
+  "_comment": "Wuifwoud's starter flora: the starter pack's species as a mixed forest, a conifer forest and bushland, the fallback flora of a project that names none.",
+  "bands": {
+    "coast_top_m": 20.0,
+    "mid_top_m": 400.0,
+    "treeline_m": 900.0,
+    "treeline_keep": 0.35
+  },
+  "species": {
+    "coast": [
+      [
+        "WW_CommonTree_3",
+        3.0
+      ],
+      [
+        "WW_CommonTree_5",
+        3.0
+      ]
+    ],
+    "mid": [
+      [
+        "WW_CommonTree_3",
+        3.0
+      ],
+      [
+        "WW_CommonTree_5",
+        3.0
+      ],
+      [
+        "WW_CommonTree_4",
+        1.5
+      ]
+    ],
+    "high": [
+      [
+        "WW_Pine_4",
+        3.0
+      ],
+      [
+        "WW_Pine_5",
+        3.0
+      ],
+      [
+        "WW_CommonTree_3",
+        1.0
+      ],
+      [
+        "WW_CommonTree_5",
+        1.0
+      ]
+    ],
+    "bush": [
+      [
+        "WW_Bush_Common",
+        3.0
+      ],
+      [
+        "WW_Fern_1",
+        3.0
+      ],
+      [
+        "WW_Plant_1_Big",
+        3.0
+      ]
+    ],
+    "orchard": [
+      [
+        "WW_CommonTree_3",
+        1.0
+      ]
+    ],
+    "conifer": [
+      [
+        "WW_Pine_4",
+        3.0
+      ],
+      [
+        "WW_Pine_5",
+        3.0
+      ],
+      [
+        "WW_CommonTree_4",
+        1.0
+      ]
+    ]
+  },
+  "dead": {
+    "mid": [
+      "WW_DeadTree_4"
+    ],
+    "high": [
+      "WW_DeadTree_4"
+    ]
+  },
+  "types": [
+    {
+      "id": 1,
+      "name": "Mixed forest",
+      "style": "natural",
+      "density_per_m2": 0.03,
+      "clump": 0.6,
+      "understory": 0.4
+    },
+    {
+      "id": 2,
+      "name": "Conifer forest",
+      "style": "natural",
+      "density_per_m2": 0.035,
+      "clump": 0.5,
+      "understory": 0.3,
+      "pools": {
+        "coast": "conifer",
+        "mid": "conifer",
+        "high": "conifer"
+      }
+    },
+    {
+      "id": 3,
+      "name": "Bushland",
+      "style": "bushes",
+      "density_per_m2": 0.004
+    }
+  ]
+}

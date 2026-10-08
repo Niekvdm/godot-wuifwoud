@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ForestSpecies" format=3]
+
+[ext_resource type="Script" path="res://addons/wuifwoud/species/forest_species.gd" id="1_pnckh"]
+
+[resource]
+script = ExtResource("1_pnckh")
+id = "WW_Pine_5"
+display_name = "Pine 5"
+crown = "conifer"
+trunk_radius = 0.22820093
+alpha_cut = 0.2
+mesh = "res://addons/wuifwoud/packs/starter/meshes/Pine_5.gltf"
+foliage_materials = PackedStringArray("Leaves_Pine")
+bark_albedo = "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png"
+bark_normal = "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png"
+foliage_albedo = "res://addons/wuifwoud/packs/starter/meshes/Leaf_Pine_C.png"

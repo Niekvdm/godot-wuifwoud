@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://c0err8hqftkg4"
+path="res://.godot/imported/hiz_build.glsl-7ff0e102de7ec359ce13a9ef6d0a7642.res"
+
+[deps]
+
+source_file="res://addons/wuifwoud/shaders/hiz_build.glsl"
+dest_files=["res://.godot/imported/hiz_build.glsl-7ff0e102de7ec359ce13a9ef6d0a7642.res"]
+
+[params]
+

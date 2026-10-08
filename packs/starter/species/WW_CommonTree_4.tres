@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ForestSpecies" format=3]
+
+[ext_resource type="Script" path="res://addons/wuifwoud/species/forest_species.gd" id="1_t36g1"]
+
+[resource]
+script = ExtResource("1_t36g1")
+id = "WW_CommonTree_4"
+display_name = "CommonTree 4"
+trunk_radius = 0.37316042
+young = true
+alpha_cut = 0.2
+mesh = "res://addons/wuifwoud/packs/starter/meshes/CommonTree_4.gltf"
+foliage_materials = PackedStringArray("Leaves_NormalTree")
+bark_albedo = "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png"
+bark_normal = "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png"
+foliage_albedo = "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png"

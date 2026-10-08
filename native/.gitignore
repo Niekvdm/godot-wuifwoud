@@ -1,0 +1,7 @@
+# Build products and godot-cpp (a checkout or a link, never committed here).
+bin/
+*.o
+*.os
+.sconsign.dblite
+.sconf_temp/
+godot-cpp

@@ -1,0 +1,12 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- ForestSpawner node icon: a conifer before a broadleaf crown. -->
+  <!-- broadleaf: trunk, then the crown (dark under, light over) -->
+  <path d="M 84 128 L 86 92 L 96 92 L 98 128 Z" fill="#6b4a2b"/>
+  <circle cx="91" cy="62" r="34" fill="#3f6b27"/>
+  <circle cx="84" cy="54" r="26" fill="#4f8a31"/>
+  <circle cx="78" cy="46" r="14" fill="#68a83f"/>
+  <!-- conifer: trunk, three tiers, the lit side lighter -->
+  <path d="M 36 128 L 38 108 L 48 108 L 50 128 Z" fill="#5a3d22"/>
+  <path d="M 43 2 L 68 40 L 56 40 L 78 74 L 64 74 L 86 110 L 0 110 L 22 74 L 8 74 L 30 40 L 18 40 Z" fill="#33531f"/>
+  <path d="M 43 2 L 43 110 L 0 110 L 22 74 L 8 74 L 30 40 L 18 40 Z" fill="#4a7c2e"/>
+</svg>

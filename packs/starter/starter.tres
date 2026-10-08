@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ForestSpeciesPack" format=3]
+
+[ext_resource type="Script" path="res://addons/wuifwoud/species/forest_species_pack.gd" id="1_telhx"]
+[ext_resource type="Script" path="res://addons/wuifwoud/species/forest_species.gd" id="2_8gs08"]
+[ext_resource type="Resource" path="res://addons/wuifwoud/packs/starter/species/WW_Bush_Common.tres" id="3_8sq01"]
+[ext_resource type="Resource" path="res://addons/wuifwoud/packs/starter/species/WW_CommonTree_3.tres" id="4_j1r3m"]
+[ext_resource type="Resource" path="res://addons/wuifwoud/packs/starter/species/WW_CommonTree_4.tres" id="5_v6ifl"]
+[ext_resource type="Resource" path="res://addons/wuifwoud/packs/starter/species/WW_CommonTree_5.tres" id="6_jpype"]
+[ext_resource type="Resource" path="res://addons/wuifwoud/packs/starter/species/WW_DeadTree_4.tres" id="7_cairf"]
+[ext_resource type="Resource" path="res://addons/wuifwoud/packs/starter/species/WW_Fern_1.tres" id="8_l51t0"]
+[ext_resource type="Resource" path="res://addons/wuifwoud/packs/starter/species/WW_Pine_4.tres" id="9_ilsfb"]
+[ext_resource type="Resource" path="res://addons/wuifwoud/packs/starter/species/WW_Pine_5.tres" id="10_b4teo"]
+[ext_resource type="Resource" path="res://addons/wuifwoud/packs/starter/species/WW_Plant_1_Big.tres" id="11_ogxcf"]
+
+[resource]
+script = ExtResource("1_telhx")
+name = "Starter trees"
+credits = "Quaternius, Stylized Nature MegaKit (Standard), CC0 1.0: https://quaternius.com/packs/stylizednaturemegakit.html (see LICENSE)."
+species = Array[ExtResource("2_8gs08")]([ExtResource("3_8sq01"), ExtResource("4_j1r3m"), ExtResource("5_v6ifl"), ExtResource("6_jpype"), ExtResource("7_cairf"), ExtResource("8_l51t0"), ExtResource("9_ilsfb"), ExtResource("10_b4teo"), ExtResource("11_ogxcf")])
