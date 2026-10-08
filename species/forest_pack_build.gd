@@ -5,13 +5,13 @@ extends RefCounted
 ## One pack build: every species of `packs` that needs building (`force`: every one; `only`: those ids), one at a time
 ## on the main thread, poll by poll. Each is PREPARED (ForestAssets.prepare_species_of, the forest's own preparation)
 ## and saved to the staging folder; its impostor BAKED (ForestImpostorBaker, a row of views a round, once per drawn
-## frame) and its sheets COMPRESSED on a worker (image work only) with the far palette's crown colour read from the
-## compressed albedo, while the next species prepares and bakes (at most MAX_STORES compressing at once, each holding
-## two full-size sheets); then, oldest first, it LANDS: its sheets saved, its files renamed from the staging folder into
-## the pack's built/, then its entry written to built.json, so a species lands whole or not at all. Cancel stops at the
-## next poll: the species already landed stay, the current one leaves nothing. The editor polls it every frame
-## (start(host), poll()), the command line too (res://addons/wuifwoud/tools/build_packs.gd); tests run it without a
-## bake (run_now()).
+## frame) and its picture rendered (ForestPicture), then its sheets COMPRESSED and its picture filtered on a worker
+## (image work only) with the far palette's crown colour read from the compressed albedo, while the next species
+## prepares and bakes (at most MAX_STORES compressing at once, each holding two full-size sheets); then, oldest first,
+## it LANDS: its sheets saved, its files renamed from the staging folder into the pack's built/, then its entry written
+## to built.json, so a species lands whole or not at all. Cancel stops at the next poll: the species already landed
+## stay, the current one leaves nothing. The editor polls it every frame (start(host), poll()), the command line too
+## (res://addons/wuifwoud/tools/build_packs.gd); tests run it without a bake (run_now()).
 ##
 ## WHY THE MAIN THREAD: every mesh read and texture save goes through the rendering server, and
 ## under its "Safe" thread model a worker's read waits for the main thread's next flush.
@@ -29,6 +29,8 @@ const BuiltRes := preload("res://addons/wuifwoud/species/forest_built_species.gd
 const BakerRes := preload("res://addons/wuifwoud/species/forest_impostor_baker.gd")
 ## The far palette (its mean colour).
 const PaletteRes := preload("res://addons/wuifwoud/forest_far_palette.gd")
+## The species' picture.
+const PictureRes := preload("res://addons/wuifwoud/species/forest_picture.gd")
 ## A pack's manifest file in built/.
 const MANIFEST := "built.json"
 ## The staging folder inside built/: hidden, so the editor's file system never lists it.
@@ -63,6 +65,7 @@ var _stores: Array = []
 ## Stores in flight at most: each holds two full-size sheets (64 MB each at GRID 8, TILE 512).
 const MAX_STORES := 2
 var _baker = null
+var _picture = null          # the picture rig, beside the baker
 var _baked := false          # this build bakes: `bake` on, and a host to bake under
 var _last_frame := -1
 var _out := {}
@@ -120,9 +123,10 @@ static func states(p_packs: Array) -> Array:
 
 
 ## Whether species `s` of the pack built in `dir` (its built.json `man`) is built: "missing" (its mesh does not
-## resolve), "unbuilt" (no entry, or a pack that is not its own file), "needs" (another prep version, its file gone, a
-## source file changed (by its size and time first, by its MD5 only when those moved: a copied built/ is no change),
-## its settings changed (its leaf materials, its alpha cut) or a file's import settings did), else "built"; with why.
+## resolve), "unbuilt" (no entry, or a pack that is not its own file), "needs" (another prep version, its file gone, no
+## picture in a baked pack or its picture gone, a source file changed (by its size and time first, by its MD5 only when
+## those moved: a copied built/ is no change), its settings changed (its leaf materials, its alpha cut) or a file's
+## import settings did), else "built"; with why.
 static func state_of(s, dir: String, man: Dictionary) -> Dictionary:
 	var mesh := SpeciesRes.resolve(String(s.mesh))
 	if mesh == "" or not ResourceLoader.exists(mesh):
@@ -137,6 +141,10 @@ static func state_of(s, dir: String, man: Dictionary) -> Dictionary:
 		return {"state": "needs", "why": "built by prep version %d, now %d" % [v, AssetsRes.PREP_VERSION]}
 	if not FileAccess.file_exists(dir.path_join(String(s.id) + ".res")):
 		return {"state": "needs", "why": "its built file is gone"}
+	if man.has("bake") and not bool(e.get("picture", false)):
+		return {"state": "needs", "why": "it has no picture yet"}
+	if bool(e.get("picture", false)) and not FileAccess.file_exists(dir.path_join(String(s.id) + "_picture.res")):
+		return {"state": "needs", "why": "its picture is gone"}
 	var src: Dictionary = e.get("sources", {})
 	var files: PackedStringArray = s.files()
 	for f in src:
@@ -220,6 +228,8 @@ func start(host: Node) -> void:
 	if _baked:
 		_baker = BakerRes.new()
 		_baker.setup(host)
+		_picture = PictureRes.new()
+		_picture.setup(host)
 	_set_progress("prepare", "", _todo.size())
 
 
@@ -244,9 +254,13 @@ func poll() -> bool:
 		if f == _last_frame:
 			return false
 		_last_frame = f
-		if _baker.step():
+		var baked: bool = _baker.step()
+		var pictured: bool = _picture.step()
+		if baked and pictured:
+			var res: Dictionary = _baker.result()
+			res["picture"] = _picture.result()
 			var out := {}
-			var task := WorkerThreadPool.add_task(_store.bind(_baker.result(), out), true, "forest_pack_store")
+			var task := WorkerThreadPool.add_task(_store.bind(res, out), true, "forest_pack_store")
 			_stores.append({"r": _current, "task": task, "out": out})
 			_set_progress("store", String(_current["id"]), _todo.size())
 			_current = {}
@@ -324,6 +338,7 @@ func _prepare(t: Dictionary) -> void:
 		var mesh: ArrayMesh = p["combined"]
 		AssetsRes._dress(s, mesh, p, false)
 		if _baker.begin(mesh):
+			_picture.begin(mesh)
 			_current = r
 			_set_progress("bake", id, _todo.size())
 			return
@@ -335,6 +350,9 @@ func _prepare(t: Dictionary) -> void:
 ## other thread touches until the task is done.
 func _store(res: Dictionary, out: Dictionary) -> void:
 	out["baked"] = true
+	var pic: Image = PictureRes.finish(res.get("picture"))
+	if pic != null:
+		out["picture"] = pic
 	if int(res.get("opaque", 0)) == 0:
 		out["warning"] = "its impostor rendered nothing: it has no card"
 	else:
@@ -373,6 +391,16 @@ func _land(r: Dictionary, b: Dictionary) -> void:
 		for f in [id + "_albedo.res", id + "_normal.res"]:
 			if FileAccess.file_exists(dst.path_join(f)):
 				DirAccess.remove_absolute(dst.path_join(f))
+	var pictured := false
+	if b.has("picture"):
+		var ep := _save_picture(b["picture"], stage.path_join(id + "_picture.res"))
+		if ep == OK:
+			pictured = true
+			files.append(id + "_picture.res")
+		else:
+			warnings.append("its picture could not be saved (%s)" % error_string(ep))
+	if not pictured and FileAccess.file_exists(dst.path_join(id + "_picture.res")):
+		DirAccess.remove_absolute(dst.path_join(id + "_picture.res"))
 	for f in files:
 		if FileAccess.file_exists(dst.path_join(f)):
 			DirAccess.remove_absolute(dst.path_join(f))
@@ -387,6 +415,8 @@ func _land(r: Dictionary, b: Dictionary) -> void:
 	if bool(b.get("baked", false)):
 		var c = b.get("crown_colour") if sheets else null
 		e["crown_colour"] = [c.r, c.g, c.b] if c is Color else null
+	if pictured:
+		e["picture"] = true
 	var man: Dictionary = _manifests.get(dir, {})
 	if _baked:
 		man["bake"] = BakerRes.settings()
@@ -407,6 +437,12 @@ static func _save_sheet(img: Image, path: String) -> Error:
 	return ResourceSaver.save(img, path)
 
 
+## The picture saved as an Image, its resource id fixed (the same picture is the same bytes whoever built it), compressed.
+static func _save_picture(img: Image, path: String) -> Error:
+	img.resource_scene_unique_id = "picture"
+	return ResourceSaver.save(img, path, ResourceSaver.FLAG_COMPRESS)
+
+
 func _fail(r: Dictionary, why: String) -> void:
 	(_out["failed"] as Dictionary)[r["id"]] = why
 	_discard(r)
@@ -418,7 +454,8 @@ func _discard(r: Dictionary) -> void:
 	if r.is_empty():
 		return
 	var stage := _stage(r["dir"])
-	for f in [String(r["id"]) + ".res", String(r["id"]) + "_albedo.res", String(r["id"]) + "_normal.res"]:
+	for f in [String(r["id"]) + ".res", String(r["id"]) + "_albedo.res", String(r["id"]) + "_normal.res",
+			String(r["id"]) + "_picture.res"]:
 		if FileAccess.file_exists(stage.path_join(f)):
 			DirAccess.remove_absolute(stage.path_join(f))
 
@@ -453,6 +490,8 @@ static func landed_anything(report: Dictionary) -> bool:
 func _stop() -> bool:
 	if _baker != null and _baker.busy():
 		_baker.abort()
+	if _picture != null and _picture.busy():
+		_picture.abort()
 	_discard(_current)
 	_current = {}
 	_out["cancelled"] = true
@@ -474,7 +513,8 @@ func _end() -> bool:
 				if (owner == "" or (held["packs"] as Dictionary).has(owner)) and not (held["ids"] as Dictionary).has(id):
 					gone.append(id)
 			for id in gone:
-				for f in [String(id) + ".res", String(id) + "_albedo.res", String(id) + "_normal.res"]:
+				for f in [String(id) + ".res", String(id) + "_albedo.res", String(id) + "_normal.res",
+						String(id) + "_picture.res"]:
 					var p := ProjectSettings.globalize_path(String(dir).path_join(f))
 					if FileAccess.file_exists(p):
 						DirAccess.remove_absolute(p)
@@ -491,6 +531,9 @@ func _end() -> bool:
 	if _baker != null:
 		_baker.free_nodes()
 		_baker = null
+	if _picture != null:
+		_picture.free_nodes()
+		_picture = null
 	report = _out.duplicate(true)
 	report["ok"] = (report["failed"] as Dictionary).is_empty() and not bool(report["cancelled"])
 	report["ms"] = Time.get_ticks_msec() - _t0
