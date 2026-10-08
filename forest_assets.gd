@@ -34,6 +34,7 @@ static var _packs: Array = []            # ForestSpeciesPack, in resolved order
 static var _species: Dictionary = {}      # id -> ForestSpecies
 static var _pack_of: Dictionary = {}      # id -> its ForestSpeciesPack
 static var _packs_loaded := false
+static var _disabled: Dictionary = {}     # id -> true: the config's disabled_species (or use_packs' `disabled`)
 static var _unknown_warned := {}
 ## Placement workers ask about species too: the one shared write (the unknown-species warning set) is locked.
 static var _unknown_lock := Mutex.new()
@@ -44,12 +45,14 @@ const DEFAULT_TRUNK_RADIUS := 0.26
 static func _ensure_packs() -> void:
 	if _packs_loaded:
 		return
-	_apply_packs(ForestConfigRes.current().resolved_packs())
+	var c := ForestConfigRes.current()
+	_apply_packs(c.resolved_packs(), c.disabled_species)
 
 
-## Tests and tools: grow from `packs` (ForestSpeciesPack) instead of the config's. Drops every cache.
-static func use_packs(packs: Array) -> void:
-	_apply_packs(packs)
+## Tests and tools: grow from `packs` (ForestSpeciesPack) instead of the config's, `disabled` switched off. Drops every
+## cache.
+static func use_packs(packs: Array, disabled := PackedStringArray()) -> void:
+	_apply_packs(packs, disabled)
 	reset()
 
 
@@ -59,21 +62,25 @@ static func forget_packs() -> void:
 	_packs = []
 	_species = {}
 	_pack_of = {}
+	_disabled = {}
 
 
 ## The packs and the tables built from them. The FIRST load drops no cache (there is none yet).
-static func _apply_packs(packs: Array) -> void:
+static func _apply_packs(packs: Array, disabled := PackedStringArray()) -> void:
 	_packs_loaded = true
 	_packs = []
 	_species = {}
 	_pack_of = {}
 	_unknown_warned.clear()
+	_disabled = {}
+	for id in disabled:
+		_disabled[String(id)] = true
 	for p in packs:
 		if p == null:
 			continue
 		_packs.append(p)
 		for sp in p.species:
-			if sp == null or String(sp.id) == "":
+			if sp == null or String(sp.id) == "" or _disabled.has(String(sp.id)):
 				continue
 			if _species.has(sp.id):
 				ForestLog.warn("[Wuifwoud] species %s is in two packs: %s's grows, %s's does not"
@@ -102,6 +109,8 @@ static func _species_entry(mesh_name: String):
 	_ensure_packs()
 	if _species.has(mesh_name):
 		return _species[mesh_name]
+	if _disabled.has(mesh_name):
+		return null
 	_unknown_lock.lock()
 	var first := not _unknown_warned.has(mesh_name)
 	_unknown_warned[mesh_name] = true
@@ -110,6 +119,20 @@ static func _species_entry(mesh_name: String):
 		ForestLog.warn("[Vegetation] %s is in no species pack: a broadleaf tree, trunk %.2f m"
 			% [mesh_name, DEFAULT_TRUNK_RADIUS])
 	return null
+
+
+## Whether species `mesh_name` is switched off (the config's disabled_species): it is in no species table then.
+static func is_disabled(mesh_name: String) -> bool:
+	_ensure_packs()
+	return _disabled.has(mesh_name)
+
+
+## The species switched off, sorted.
+static func disabled_ids() -> PackedStringArray:
+	_ensure_packs()
+	var out := PackedStringArray(_disabled.keys())
+	out.sort()
+	return out
 
 
 ## A pack has `mesh_name` (no warning: the forest asks before a single tree or a row pins one).

@@ -34,6 +34,10 @@ const SET_FILE := "wuifwoud_packs.tres"
 ## pack addon, or the starter pack.
 @export var disabled_packs := PackedStringArray()
 
+## Species not to grow, by id: dropped from every mix when a flora profile loads (the rest of a mix share its weight); a
+## single tree or a row that pins one grows its type's pick instead.
+@export var disabled_species := PackedStringArray()
+
 @export_group("Flora")
 
 ## The flora used where a map names no profile: a profile file whose species and dead pools are the fallback. Empty:
@@ -86,43 +90,62 @@ static func use(c: ForestConfig) -> void:
 	_current = c
 
 
-## The packs that grow, by where they come from, in order: the ones this config lists, each pack addon's set (sorted
-## by folder) in the set's own order, then the starter: [{name, kind ("project" | "addon" | "wuifwoud"), path,
-## packs}], less disabled_packs; a pack counts once, where it comes first; a source left with no pack is left out. A
-## set or a pack that will not load is skipped and named.
-func resolved_sources(addons_dir := "res://addons") -> Array:
+## Every pack the project lists, by where it comes from, in order, switched off or not: the ones this config lists,
+## each pack addon's set (sorted by folder) in the set's own order, then the starter: [{name, kind ("project" |
+## "addon" | "wuifwoud"), path, enabled, packs: [{pack, enabled}]}]. A pack is switched off when disabled_packs names it
+## or its set. A pack counts once, where it first grows. A set or a pack that will not load is skipped and named.
+func listed_sources(addons_dir := "res://addons") -> Array:
 	var out := []
 	var seen := {}
 	for p in packs:
 		if p == null:
 			ForestLog.warn("[Wuifwoud] the config has an empty pack slot: skipped")
 			continue
-		if not seen.has(_key(p)) and not disabled_packs.has(p.resource_path):
-			seen[_key(p)] = true
-			out.append({"name": _label(p), "kind": "project", "path": p.resource_path, "packs": [p]})
-	for path in discovered_set_paths(addons_dir):
-		if disabled_packs.has(path):
+		if seen.has(_key(p)):
 			continue
+		var on := not disabled_packs.has(p.resource_path)
+		if on:
+			seen[_key(p)] = true
+		out.append({"name": _label(p), "kind": "project", "path": p.resource_path, "enabled": on,
+			"packs": [{"pack": p, "enabled": on}]})
+	for path in discovered_set_paths(addons_dir):
 		var ps = load(path)
 		if not (ps is ForestPackSet):
 			ForestLog.warn("[Wuifwoud] %s is not a pack set (ForestPackSet): skipped" % path)
 			continue
-		var mine := []
+		var set_on := not disabled_packs.has(path)
+		var rows := []
 		for p in ps.packs:
 			if p == null:
 				ForestLog.warn("[Wuifwoud] %s lists a pack that will not load: skipped" % path)
 				continue
-			if not seen.has(_key(p)) and not disabled_packs.has(p.resource_path):
+			if seen.has(_key(p)):
+				continue
+			var on := set_on and not disabled_packs.has(p.resource_path)
+			if on:
 				seen[_key(p)] = true
-				mine.append(p)
-		if not mine.is_empty():
+			rows.append({"pack": p, "enabled": on})
+		if not rows.is_empty():
 			var nm := String(ps.name) if String(ps.name) != "" else path.get_base_dir().get_file()
-			out.append({"name": nm, "kind": "addon", "path": path, "packs": mine})
+			out.append({"name": nm, "kind": "addon", "path": path, "enabled": set_on, "packs": rows})
 	var starter := starter_pack_path()
-	if starter != "" and not disabled_packs.has(starter) and ResourceLoader.exists(starter):
+	if starter != "" and ResourceLoader.exists(starter):
 		var st = load(starter)
 		if st is ForestSpeciesPack and not seen.has(_key(st)):
-			out.append({"name": "Starter trees", "kind": "wuifwoud", "path": starter, "packs": [st]})
+			var on := not disabled_packs.has(starter)
+			out.append({"name": "Starter trees", "kind": "wuifwoud", "path": starter, "enabled": on,
+				"packs": [{"pack": st, "enabled": on}]})
+	return out
+
+
+## The packs that grow, by where they come from, in order: listed_sources less what is switched off, a source left
+## with no pack left out: [{name, kind, path, packs}].
+func resolved_sources(addons_dir := "res://addons") -> Array:
+	var out := []
+	for src in listed_sources(addons_dir):
+		var on := (src["packs"] as Array).filter(func(row): return bool(row["enabled"])).map(func(row): return row["pack"])
+		if not on.is_empty():
+			out.append({"name": src["name"], "kind": src["kind"], "path": src["path"], "packs": on})
 	return out
 
 

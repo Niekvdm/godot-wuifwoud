@@ -1050,6 +1050,7 @@ func _name_species() -> void:
 func _load_profile_pools() -> void:
 	_species = _fallback_pools()["species"]
 	_dead = _fallback_pools()["dead"]
+	_drop_disabled()
 	_coast_m = _COAST_M
 	_mid_m = _MID_M
 	_treeline_m = _TREELINE_M
@@ -1080,6 +1081,7 @@ func _load_profile_pools() -> void:
 		_dead = (_fallback_pools()["dead"] as Dictionary).duplicate(true)
 		for band in dd:
 			_dead[band] = dd[band]
+	_drop_disabled()
 	# The stand numbers live in the forest types: a leftover block is said, not silently read.
 	if data.has("forest"):
 		ForestLog.warn("[Vegetation] %s still has a `forest` block: its numbers belong in `types` now. Remove the key."
@@ -1096,6 +1098,13 @@ func _load_profile_pools() -> void:
 		ForestLog.warn("[Vegetation] %s has no forest types, so nothing grows" % profile_path.get_file())
 	ForestLog.debug("[Vegetation] flora profile: %s (bands %.0f/%.0f, treeline %.0f; %d forest type(s))" % [
 		profile_path.get_file(), _coast_m, _mid_m, _treeline_m, _types.by_id.size()])
+
+
+## The species switched off (ForestConfig.disabled_species) leave every pool: the rest of a pool share its weight.
+func _drop_disabled() -> void:
+	var off := ForestAssets.disabled_ids()
+	_species = ForestTypesRes.drop_species(_species, off)
+	_dead = ForestTypesRes.drop_species(_dead, off)
 
 
 ## The native tables for the profile as it is now: built on the main thread when a job first needs them after
@@ -1785,7 +1794,10 @@ func _items_for(rect: Rect2) -> Array:
 		if sp != "" and not ForestAssets.has_species(sp):
 			if not _species_warned.has(sp):
 				_species_warned[sp] = true
-				ForestLog.warn("[Wuifwoud] a single tree or row pins species %s, which no species pack has: its type picks instead" % sp)
+				if ForestAssets.is_disabled(sp):
+					ForestLog.warn("[Wuifwoud] a single tree or row pins species %s, which is switched off: its type picks instead" % sp)
+				else:
+					ForestLog.warn("[Wuifwoud] a single tree or row pins species %s, which no species pack has: its type picks instead" % sp)
 			it["species"] = ""
 	return out
 

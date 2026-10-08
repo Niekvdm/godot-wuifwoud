@@ -154,3 +154,23 @@ func _pool(species: Dictionary, name: String, label: String):
 		errors.append("%s names pool '%s', which neither the profile nor the fallback flora has" % [label, name])
 		return null
 	return species[name]
+
+
+## `pools` (name -> [[id, weight], …] or [id, …]) without the species `ids` names: a new dictionary, each pool's other
+## entries in their order with their weights (a pool left empty stays, empty). `pools` itself when `ids` is empty: a
+## project with nothing switched off loads exactly what it loaded before.
+static func drop_species(pools: Dictionary, ids: PackedStringArray) -> Dictionary:
+	if ids.is_empty():
+		return pools
+	var gone := {}
+	for id in ids:
+		gone[String(id)] = true
+	var out := {}
+	for k in pools:
+		var pool = pools[k]
+		if typeof(pool) != TYPE_ARRAY:
+			out[k] = pool
+			continue
+		out[k] = (pool as Array).filter(func(e) -> bool:
+			return not gone.has(str(e[0]) if typeof(e) == TYPE_ARRAY else str(e)))
+	return out
