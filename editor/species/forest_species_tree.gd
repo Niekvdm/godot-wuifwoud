@@ -98,6 +98,12 @@ static func _pack_row(d, pr: Dictionary, shown: Array, narrowing: bool) -> Contr
 	sw.tooltip_text = "Grow this pack"
 	sw.toggled.connect(func(t: bool) -> void: d.set_pack_enabled(pr["src"], pack, t))
 	h.add_child(sw)
+	if not d.is_read_only(pack) and String(pack.resource_path) != "":
+		var add: Button = d.kit.chip("+ Add species…", false, d.accent)
+		add.name = "AddSpecies"
+		add.disabled = d.busy()
+		add.pressed.connect(d.add_species.bind(pack))
+		h.add_child(add)
 	var items := [{"id": MENU_BUILD, "text": "Build this pack", "disabled": d.busy() or String(pack.resource_path) == ""},
 		{"id": MENU_SHOW, "text": "Show in FileSystem", "disabled": String(pack.resource_path) == ""}]
 	var menu = d.kit.menu_chip("⋯", items, d.accent, func(id: int) -> void: pack_menu(d, pack, id))

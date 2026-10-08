@@ -24,6 +24,11 @@ const TreeRes := preload("res://addons/wuifwoud/editor/species/forest_species_tr
 const PanelRes := preload("res://addons/wuifwoud/editor/species/forest_species_panel.gd")
 ## The species pictures.
 const PicturesRes := preload("res://addons/wuifwoud/editor/common/forest_pictures.gd")
+## Add species.
+const AddRes := preload("res://addons/wuifwoud/editor/species/forest_species_add.gd")
+## The mesh files a species takes.
+const MESH_FILTERS := ["*.gltf, *.glb, *.fbx, *.FBX, *.blend ; Meshes", "*.tscn, *.scn ; Scenes"]
+
 ## Undo steps kept at most.
 const UNDO_MAX := 100
 ## The dialog's size.
@@ -501,6 +506,8 @@ func open_tile_menu(id: String, at: Vector2) -> void:
 	_tile_menu.add_item("Disable" if not config.disabled_species.has(id) else "Enable", TILE_TOGGLE)
 	_tile_menu.add_item("Build", TILE_BUILD)
 	_tile_menu.set_item_disabled(_tile_menu.item_count - 1, busy() or String(row["state"]) == "missing")
+	_tile_menu.add_item("Remove from pack", TILE_REMOVE)
+	_tile_menu.set_item_disabled(_tile_menu.item_count - 1, is_read_only(row["pack"]))
 	_tile_menu.add_item("Show in FileSystem", TILE_SHOW)
 	_tile_menu.id_pressed.connect(func(item: int) -> void: tile_menu_action(id, item))
 	add_child(_tile_menu)
@@ -514,6 +521,10 @@ func tile_menu_action(id: String, item: int) -> void:
 			set_species_enabled(id, config.disabled_species.has(id))
 		TILE_BUILD:
 			build_species(id)
+		TILE_REMOVE:
+			var rr := row_of(id)
+			if not rr.is_empty():
+				remove_from_pack(id, rr["pack"])
 		TILE_SHOW:
 			var row := row_of(id)
 			if not row.is_empty() and show_file.is_valid():
@@ -538,6 +549,62 @@ func set_field(sp, field: String, value) -> void:
 func pick(title: String, filters: PackedStringArray, dir: bool, on_pick: Callable) -> void:
 	if pick_file.is_valid():
 		pick_file.call(title, filters, dir, on_pick)
+
+
+## + Add species… on `pack`: the picker, then add_species_from.
+func add_species(pack) -> void:
+	if is_read_only(pack) or String(pack.resource_path) == "":
+		return
+	pick("A tree or bush mesh for %s" % pack_label(pack), PackedStringArray(MESH_FILTERS), false,
+		func(p: String) -> void: add_species_from(pack, p))
+
+
+## A new species of mesh `path` in `pack`: saved as <pack folder>/species/<id>.tres, added, selected. One undo step (its
+## file stays when it is undone).
+func add_species_from(pack, path: String) -> bool:
+	if is_read_only(pack) or String(pack.resource_path) == "":
+		return false
+	var taken := {}
+	for pr in all_packs():
+		for s in pr["pack"].species:
+			if s != null:
+				taken[String(s.id)] = true
+	var sp: ForestSpecies = AddRes.make(path, taken)
+	var file := AddRes.species_path(pack, String(sp.id))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(file.get_base_dir()))
+	var e := ResourceSaver.save(sp, file, ResourceSaver.FLAG_CHANGE_PATH)
+	if e != OK:
+		error = "Could not write %s (%s)" % [file, error_string(e)]
+		rebuild()
+		return false
+	selected = String(sp.id)
+	return change(func() -> String:
+		var arr: Array[ForestSpecies] = []
+		arr.assign(pack.species)
+		arr.append(sp)
+		pack.species = arr
+		note = "Added %s (%s)." % [sp.id, file]
+		return "")
+
+
+## Take species `id` out of `pack` (its file stays). One undo step.
+func remove_from_pack(id: String, pack) -> void:
+	if is_read_only(pack):
+		return
+	var sp = null
+	for s in pack.species:
+		if s != null and String(s.id) == id:
+			sp = s
+	if sp == null:
+		return
+	change(func() -> String:
+		var arr: Array[ForestSpecies] = []
+		for s in pack.species:
+			if s != sp:
+				arr.append(s)
+		pack.species = arr
+		note = "%s is out of %s; its file %s stays." % [id, pack_label(pack), String(sp.resource_path)]
+		return "")
 
 
 ## Select species `id`.
