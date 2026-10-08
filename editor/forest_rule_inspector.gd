@@ -4,11 +4,13 @@
 extends RefCounted
 ## The Rules tab's right column: the selected rule, its type (the profile's types with their icons, in its order, and
 ## No forest; a type the profile lacks shown, so the rule can be moved off it), its match (a line a key; every key must
-## match; ✕ takes a value out), Density and Age, and for points and lines Spacing, Clearance and the species
-## (written on release), and Delete.
+## match; ✕ takes a value out), Density and Age, and for points and lines Spacing and Clearance (written on release)
+## and the species (a picker), and Delete.
 
 ## Errors.
 const ERROR := Color("ff8a80")
+## The species picker.
+const PickerRes := preload("res://addons/wuifwoud/editor/common/forest_species_picker.gd")
 
 
 ## The inspector of rule `i` for the dialog `d`.
@@ -120,24 +122,21 @@ static func _commit_slider(d, i: int, field: String, s: HSlider, changed: bool) 
 		d.change(func() -> void: d.mapping.set_field(i, field, val))
 
 
-## The species a rule's points and lines grow: By type (the type picks) or one of the profile's.
+## The species a rule's points and lines grow: a label and the picker, By type (the type picks) or one of the forest's
+## species or any species the packs grow.
 static func _species(d, i: int, sp: String) -> Control:
-	var flow := HFlowContainer.new()
-	flow.name = "Species"
-	var group := ButtonGroup.new()
-	var by: Button = d.kit.toggle_chip("By type", sp == "", d.accent)
-	by.name = "SpeciesBy"
-	by.button_group = group
-	by.pressed.connect(func() -> void: _set_species(d, i, "", sp))
-	flow.add_child(by)
-	for nm in d.species:
-		var b: Button = d.kit.toggle_chip(String(nm), String(nm) == sp, d.accent)
-		b.name = "Species_" + String(nm).validate_node_name()
-		b.button_group = group
-		var at := String(nm)
-		b.pressed.connect(func() -> void: _set_species(d, i, at, sp))
-		flow.add_child(b)
-	return flow
+	var row := HBoxContainer.new()
+	row.name = "SpeciesRow"
+	row.add_theme_constant_override("separation", 6)
+	var l := Label.new()
+	l.text = "Species"
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(l)
+	var pk = PickerRes.new().setup(d.kit, sp, PickerRes.choices(PackedStringArray(d.species)), d.accent)
+	pk.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pk.picked.connect(func(to: String) -> void: _set_species(d, i, to, sp))
+	row.add_child(pk)
+	return row
 
 
 static func _set_species(d, i: int, to: String, was: String) -> void:

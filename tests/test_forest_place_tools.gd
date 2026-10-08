@@ -323,7 +323,7 @@ static func run() -> Dictionary:
 		var owner_l: Label = box.find_child("Owner", true, false)
 		_chk(r, "the panel: the selected row (who owns it, its type, species, age, spacing, clearance, Delete) and the settings new items take (%s)" % (owner_l.text if owner_l != null else "no panel"),
 			box.find_child("PlacePanel", true, false) != null and owner_l != null and owner_l.text == "row %d (imported)" % r77
-			and box.find_child("Type1", true, false) != null and box.find_child("SpeciesBy", true, false) != null
+			and box.find_child("Type1", true, false) != null and box.find_child("Species", true, false) is Button
 			and box.find_child("Age", true, false) != null and box.find_child("Spacing", true, false) != null
 			and box.find_child("Clearance", true, false) != null and box.find_child("DeleteItem", true, false) != null
 			and box.find_child("RevertItem", true, false) == null and box.find_child("NewSpacing", true, false) != null)
@@ -343,6 +343,24 @@ static func run() -> Dictionary:
 		var cap_state: Dictionary = p.capture("forest.row")
 		_chk(r, "the new items' settings follow their sliders and ride in a preset (%s)" % str(cap_state),
 			is_equal_approx(p.place.spacing, 12.0) and is_equal_approx(float(cap_state.get("spacing", 0.0)), 12.0))
+		var sel_pk = box.find_child("Species", true, false)
+		var sel_offered: PackedStringArray = sel_pk.offered if sel_pk != null and sel_pk.has_method("choose") else PackedStringArray()
+		if sel_pk != null and sel_pk.has_method("choose"):
+			sel_pk.choose("W_Plum")
+		var with_sp: Dictionary = vp.trees.items[r77]
+		var face2 = box.find_child("Species", true, false)
+		_chk(r, "the selected item's species is one picker offering the forest's species and every species the packs grow; a pick is one undo step, the panel refills with it (%s; %s)" % [
+			str(sel_offered), str(with_sp.get("species", ""))],
+			["W_Bush", "W_Old", "W_Plum"].all(func(id): return sel_offered.has(id))
+			and Array(vp.species_names()).all(func(id): return sel_offered.has(id))
+			and str(with_sp.get("species", "")) == "W_Plum"
+			and undo.actions[-1]["name"] == "Forest: Change species" and face2 is Button and face2 != sel_pk
+			and String(face2.text).begins_with("W Plum"))
+		var new_pk = box.find_child("NewSpecies", true, false)
+		if new_pk != null and new_pk.has_method("choose"):
+			new_pk.choose("W_Bush")
+		_chk(r, "the new items' species is a picker: a pick sets what new items pin and the face shows it (%s)" % p.place.species,
+			new_pk is Button and p.place.species == "W_Bush" and String(new_pk.text).begins_with("W Bush"))
 		box.free()
 
 	# ── the overlay ──

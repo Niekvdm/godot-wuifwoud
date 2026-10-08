@@ -21,6 +21,8 @@ const OverlayRes := preload("res://addons/wuifwoud/editor/forest_place_overlay.g
 const TypeTileRes := preload("res://addons/wuifwoud/editor/common/forest_type_tile.gd")
 ## A type chip's icon (px).
 const CHIP_ICON_PX := 16
+## The species picker.
+const PickerRes := preload("res://addons/wuifwoud/editor/common/forest_species_picker.gd")
 ## Errors.
 const ERROR := Color("ff8a80")
 ## The Tree tool's id.
@@ -610,7 +612,7 @@ func _selected_section(f: Node, it: Dictionary) -> void:
 		b.pressed.connect(func() -> void: _edit("type", to))
 		types.add_child(b)
 	_box.add_child(types)
-	_box.add_child(_species_chips(f, str(it.get("species", "")), "", func(sp: String) -> void: _edit("species", sp)))
+	_box.add_child(_species_row(f, str(it.get("species", "")), "", func(sp: String) -> void: _edit("species", sp)))
 	_box.add_child(_slider("Age", -1.0, 1.0, 0.05, float(it["age"]), "", func(v: float) -> void: _edit("age", v), true))
 	if it["kind"] == "row":
 		_box.add_child(_slider("Spacing", ForestTreesRes.MIN_SPACING_M, 50.0, 0.5, float(it["spacing_m"]), "m",
@@ -633,7 +635,7 @@ func _selected_section(f: Node, it: Dictionary) -> void:
 func _new_section(f: Node) -> void:
 	_box.add_child(_kit.section("New items"))
 	if f != null:
-		_box.add_child(_species_chips(f, species, "New", func(sp: String) -> void: species = sp))
+		_box.add_child(_species_row(f, species, "New", func(sp: String) -> void: species = sp))
 	_box.add_child(_slider("NewAge", -1.0, 1.0, 0.05, age, "", func(v: float) -> void: age = v, false, "Age"))
 	if _tool == ROW:
 		_box.add_child(_slider("NewSpacing", ForestTreesRes.MIN_SPACING_M, 50.0, 0.5, spacing, "m",
@@ -645,24 +647,21 @@ func _new_section(f: Node) -> void:
 			func(v: float) -> void: tree_clear = v, false, "Clearance"))
 
 
-## By type, or one of the profile's species (named `prefix` + "Species…").
-func _species_chips(f: Node, current: String, prefix: String, on_pick: Callable) -> Control:
-	var flow := HFlowContainer.new()
-	flow.name = prefix + "Species"
-	var g := ButtonGroup.new()
-	var by: Button = _kit.toggle_chip("By type", current == "", _accent)
-	by.name = prefix + "SpeciesBy"
-	by.button_group = g
-	by.pressed.connect(func() -> void: on_pick.call(""))
-	flow.add_child(by)
-	for nm in f.species_names():
-		var b: Button = _kit.toggle_chip(String(nm), String(nm) == current, _accent)
-		b.name = prefix + "Species_" + String(nm).validate_node_name()
-		b.button_group = g
-		var at := String(nm)
-		b.pressed.connect(func() -> void: on_pick.call(at))
-		flow.add_child(b)
-	return flow
+## The species row: a label and the picker (named `prefix` + "Species…"): By type, or one of the forest's species or any
+## species the packs grow; `on_pick` gets its id ("": By type).
+func _species_row(f: Node, current: String, prefix: String, on_pick: Callable) -> Control:
+	var row := HBoxContainer.new()
+	row.name = prefix + "SpeciesRow"
+	row.add_theme_constant_override("separation", 6)
+	var l := Label.new()
+	l.text = "Species"
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(l)
+	var pk = PickerRes.new().setup(_kit, current, PickerRes.choices(f.species_names()), _accent, prefix)
+	pk.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pk.picked.connect(on_pick)
+	row.add_child(pk)
+	return row
 
 
 ## A slider row named `nm`: `on_value` gets its value when let go (`on_release`: one undo step) or as it moves.

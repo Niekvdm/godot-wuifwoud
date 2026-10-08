@@ -9,7 +9,7 @@ extends RefCounted
 ## Run needs, Run, the progress and Cancel (the rules read-only meanwhile), the report, the overwrite question); the
 ## source's values and dragging them onto rules, back, and between rows. The sources listed, added and removed; a
 ## line's value its length, a point's its count; the tiles capped; a rule's spacing, clearance and
-## species; read-only while the import runs; the report's single trees and rows; the profile's species and
+## species (the picker); read-only while the import runs; the report's single trees and rows; the profile's species and
 ## a malformed mapping named in the context.
 ##
 ## Run with a unit-suite runner: static run() returns {name, passed, failed, details}.
@@ -395,6 +395,7 @@ static func run() -> Dictionary:
 	mv.free()
 	b.reader.files["scan"] = ImportRes.scan_source(feats)
 	b.reader.rules.erase("rule_m")
+	VA.use_packs([PackOf.make(CAT)])
 	var it = b.dialog(_mapping(RULES3), {"species": ["W_Bush", "W_Old"]})
 	it.select(0)
 	var sp_s := it.find_child("Spacing", true, false).get_node("Slider") as HSlider
@@ -403,14 +404,21 @@ static func run() -> Dictionary:
 	var cl_s := it.find_child("Clearance", true, false).get_node("Slider") as HSlider
 	cl_s.value = 4.0
 	cl_s.drag_ended.emit(true)
-	(it.find_child("Species_W_Old", true, false) as Button).pressed.emit()
+	var ipk = it.find_child("Species", true, false)
+	var i_offered: PackedStringArray = ipk.offered if ipk != null and ipk.has_method("choose") else PackedStringArray()
+	if ipk != null and ipk.has_method("choose"):
+		ipk.choose("W_Old")
 	var item_rule: Dictionary = _saved()["rules"][0]
-	(it.find_child("SpeciesBy", true, false) as Button).pressed.emit()
+	var ipk2 = it.find_child("Species", true, false)
+	if ipk2 != null and ipk2.has_method("choose"):
+		ipk2.choose("")
 	(it.find_child("ClearDefault", true, false) as Button).pressed.emit()
 	var after_rule: Dictionary = _saved()["rules"][0]
-	_chk(r, "the inspector's single trees and rows: spacing and clearance on release, a species picked; By type and the kind's clearance take them out again (%s)" % str(item_rule),
+	_chk(r, "the inspector's single trees and rows: spacing and clearance on release, a species from the picker (the forest's species and every species the packs grow); By type and the kind's clearance take them out again (%s; %s)" % [
+		str(item_rule), str(i_offered)],
 		is_equal_approx(float(item_rule.get("spacing_m", 0.0)), 6.0) and is_equal_approx(float(item_rule.get("clear_m", 0.0)), 4.0)
-		and item_rule.get("species", "") == "W_Old" and not after_rule.has("species") and not after_rule.has("clear_m"))
+		and item_rule.get("species", "") == "W_Old" and not after_rule.has("species") and not after_rule.has("clear_m")
+		and i_offered == PackedStringArray(["W_Bush", "W_Old"]) and ipk2 != ipk)
 	it.free()
 
 	# ── what the plugin opens the dialog with ──
