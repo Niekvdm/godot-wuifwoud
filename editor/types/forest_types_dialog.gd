@@ -26,6 +26,8 @@ const LanesRes := preload("res://addons/wuifwoud/editor/types/forest_type_lanes.
 const StripRes := preload("res://addons/wuifwoud/editor/types/forest_species_strip.gd")
 ## The species pictures.
 const PicturesRes := preload("res://addons/wuifwoud/editor/common/forest_pictures.gd")
+## The Bands tab.
+const BandsRes := preload("res://addons/wuifwoud/editor/types/forest_bands_tab.gd")
 ## The type icons.
 const TypeTileRes := preload("res://addons/wuifwoud/editor/common/forest_type_tile.gd")
 ## The forest's species.
@@ -501,6 +503,11 @@ func set_style(id: int, style: String) -> void:
 	change(func() -> String: return profile.set_style(id, style))
 
 
+## Band `key` (ForestProfile.set_band): one undo step.
+func set_band(key: String, value: float) -> void:
+	change(func() -> String: return profile.set_band(key, value))
+
+
 ## What type `id` grows, in words, and which import rules paint it: "One tree every 5.1 m · painted by import rule 2".
 func footer_text(id: int) -> String:
 	var style := str(profile.value_of(id, "style"))
@@ -897,11 +904,9 @@ func _lanes_column() -> Control:
 	return LanesRes.build(self)
 
 
-## The Bands tab: empty until it is built.
+## The Bands tab.
 func _bands() -> Control:
-	var v := VBoxContainer.new()
-	v.name = "Bands"
-	return v
+	return BandsRes.build(self)
 
 
 ## A message in place of the columns, with Create a profile… or Save a copy… as its action ("": none).
