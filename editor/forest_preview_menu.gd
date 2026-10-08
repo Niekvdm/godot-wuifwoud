@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 @tool
 extends MenuButton
-## The 3D editor's "Forest" menu: show or hide the forest preview, re-grow it, and open the Species dialog. Writes
+## The 3D editor's "Forest" menu: show or hide the forest preview, re-grow it, and open the Species and Types dialogs. Writes
 ## ForestPreview.visible; `changed` tells the plugin to keep it in the project's
 ## editor metadata.
 
@@ -12,6 +12,8 @@ signal changed
 signal regrow_requested
 ## Species… chosen.
 signal species_requested
+## Types… chosen.
+signal types_requested
 
 ## The editor preview's switch.
 const ForestPreviewRes := preload("res://addons/wuifwoud/forest_preview.gd")
@@ -21,6 +23,8 @@ const ID_SHOW := 0
 const ID_REGROW := 1
 ## Species…'s id.
 const ID_SPECIES := 2
+## Types…'s id.
+const ID_TYPES := 3
 
 
 func _init() -> void:
@@ -32,6 +36,7 @@ func _init() -> void:
 	p.add_item("Re-grow", ID_REGROW)
 	p.add_separator()
 	p.add_item("Species…", ID_SPECIES)
+	p.add_item("Types…", ID_TYPES)
 	p.id_pressed.connect(_on_id)
 	sync()
 
@@ -51,3 +56,5 @@ func _on_id(id: int) -> void:
 		regrow_requested.emit()
 	elif id == ID_SPECIES:
 		species_requested.emit()
+	elif id == ID_TYPES:
+		types_requested.emit()

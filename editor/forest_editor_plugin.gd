@@ -3,14 +3,17 @@
 @tool
 extends EditorPlugin
 ## Wuifwoud in the editor: the Forest menu (the preview switch, kept in the project's editor metadata and never in a
-## scene; Re-grow; Species…), the Forest workspace in Terrain3D Extended when it is installed (1.2 or newer), the
+## scene; Re-grow; Species…; Types…), the Forest workspace in Terrain3D Extended when it is installed (1.2 or newer), the
 ## painted forest maps and the single trees and rows (trees.json) saved with the scene, and the Import dialog, opened
 ## from the workspace's ⋯, whose import runs on a worker this plugin polls every frame; when it lands, every forest map
 ## and trees file of that folder in the editor catches up (the unsaved edits were handed to the import). The forest node
 ## is @tool on its own: without this plugin it still previews, and nothing paints, places or imports. The edited
 ## scene's forest is found by ForestFinder. Species… (the menu, the workspace's ⋯, the inspector of a species or a pack)
 ## opens the Species dialog; a build it starts is polled here every frame, and when it lands, or when the dialog changes
-## a species, a pack or the config, the packs are resolved again and the scene's forest regrows.
+## a species, a pack or the config, the packs are resolved again and the scene's forest regrows. Types… (the menu, the
+## workspace's ⋯ and its library's footer) opens the Types dialog on the edited scene's flora profile; each write it makes
+## reloads the scene's forest's types (at most every 250 ms), and a profile it creates is set on the forest node as one
+## undo step in the scene's history.
 
 ## The project's editor metadata section the plugin keeps its settings in.
 const SECTION := "wuifwoud"
@@ -54,6 +57,8 @@ const UseRes := preload("res://addons/wuifwoud/editor/species/forest_species_use
 const InspectorRes := preload("res://addons/wuifwoud/editor/forest_species_inspector.gd")
 ## The species' assets (their caches).
 const ForestAssetsRes := preload("res://addons/wuifwoud/forest_assets.gd")
+## The Types dialog.
+const TypesDialogRes := preload("res://addons/wuifwoud/editor/types/forest_types_dialog.gd")
 
 var _menu: MenuButton = null
 var _paint = null
@@ -64,6 +69,8 @@ var _build = null               # the running or last pack build (ForestPackBuil
 var _species_dialog: Control = null
 var _inspector = null
 var _regrow_at := -1         # when the Species dialog's last change asks the forest to grow again (ms; -1: none)
+var _types_dialog: Control = null
+var _retype_at := -1         # when the Types dialog's last write asks the forest to read its types again (ms; -1: none)
 var _reader = ReaderRes.new()   # shared by the Import dialog and the Revert brush
 var _picker: EditorFileDialog = null
 var _doc := {"key": "", "doc": {}}   # the edited scene's mapping for the Revert brush; key "": read it again
@@ -80,6 +87,7 @@ func _enter_tree() -> void:
 	_menu.changed.connect(_on_menu_changed)
 	_menu.regrow_requested.connect(_regrow)
 	_menu.species_requested.connect(open_species)
+	_menu.types_requested.connect(open_types)
 	_inspector = InspectorRes.new()
 	_inspector.open = open_species
 	add_inspector_plugin(_inspector)
@@ -101,6 +109,9 @@ func _exit_tree() -> void:
 	if _species_dialog != null and is_instance_valid(_species_dialog):
 		_species_dialog.queue_free()
 	_species_dialog = null
+	if _types_dialog != null and is_instance_valid(_types_dialog):
+		_types_dialog.queue_free()
+	_types_dialog = null
 	if _inspector != null:
 		remove_inspector_plugin(_inspector)
 	_inspector = null
@@ -133,6 +144,9 @@ func _process(_dt: float) -> void:
 	if _regrow_at >= 0 and Time.get_ticks_msec() >= _regrow_at:
 		_regrow_at = -1
 		_regrow()
+	if _retype_at >= 0 and Time.get_ticks_msec() >= _retype_at:
+		_retype_at = -1
+		_retype()
 
 
 func _on_menu_changed() -> void:
@@ -166,6 +180,7 @@ func _register_paint() -> void:
 	_paint.mapping_of = _mapping_doc
 	_paint.import_requested.connect(_open_import)
 	_paint.species_requested.connect(open_species)
+	_paint.types_requested.connect(open_types)
 	load(PROVIDERS).register(_paint)
 
 
@@ -319,3 +334,60 @@ func _on_built(report: Dictionary) -> void:
 		return
 	EditorInterface.get_resource_filesystem().scan()
 	_regrow()
+
+
+## Forest → Types…, the workspace's ⋯ and its library's footer: the Types dialog for the edited scene's forest, over the
+## editor, one at a time.
+func open_types() -> void:
+	if _types_dialog != null and is_instance_valid(_types_dialog):
+		return
+	var ctx := TypesDialogRes.context_for(_forest(), KitRes.new(KitRes.overlay()))
+	ctx["pick_save"] = _pick_save
+	ctx["set_profile"] = _set_profile
+	ctx["rules_of"] = func() -> Array:
+		var rules = _mapping_doc().get("rules", [])
+		return rules if rules is Array else []
+	_types_dialog = TypesDialogRes.new()
+	_types_dialog.setup(ctx)
+	_types_dialog.changed.connect(func() -> void: _retype_at = Time.get_ticks_msec() + 250)
+	_types_dialog.closed.connect(func() -> void: _types_dialog = null)
+	EditorInterface.get_base_control().add_child(_types_dialog)
+
+
+## The edited scene's forest reads its flora profile again (the Types dialog wrote it) and the workspace's library
+## follows.
+func _retype() -> void:
+	var f := _forest()
+	if f != null:
+		f.reload_types()
+	if _paint != null:
+		_paint.library_changed.emit()
+
+
+## The edited scene's forest takes flora profile `path`: one undo step in that scene's history, its types read again.
+func _set_profile(path: String) -> void:
+	var f := _forest()
+	if f == null:
+		return
+	var ur := get_undo_redo()
+	ur.create_action("Forest: flora profile", UndoRedo.MERGE_DISABLE, f)
+	ur.add_do_property(f, "profile_path", path)
+	ur.add_undo_property(f, "profile_path", f.profile_path)
+	ur.add_do_method(self, &"_retype")
+	ur.add_undo_method(self, &"_retype")
+	ur.commit_action()
+
+
+## An editor save dialog over the editor, starting at file `start`; `on_pick` gets the path chosen.
+func _pick_save(title: String, filters: PackedStringArray, start: String, on_pick: Callable) -> void:
+	if _picker != null and is_instance_valid(_picker):
+		_picker.queue_free()
+	_picker = EditorFileDialog.new()
+	_picker.title = title
+	_picker.access = EditorFileDialog.ACCESS_RESOURCES
+	_picker.file_mode = EditorFileDialog.FILE_MODE_SAVE_FILE
+	_picker.filters = filters
+	_picker.current_path = start
+	_picker.file_selected.connect(func(p: String) -> void: on_pick.call(p))
+	EditorInterface.get_base_control().add_child(_picker)
+	_picker.popup_centered_ratio(0.6)

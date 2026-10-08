@@ -105,9 +105,14 @@ A flora profile's `types` list defines each map type:
 | `bush_pool` | all | `"bush"` |
 | `pool` | grid | `"orchard"` |
 | `tree_pool`, `tree_share` | mix | `"mid"`, 0.6 |
+| `mixes` (`coast`, `mid`, `high`, `bush`; a grid's `grid`; a mix's `trees`; `dead`: band → list) | all | none: each lane inherits |
+| `icon` (`conifer`, `broadleaf`, `palm`, `bush`, `mixed`, `orchard`, `garden`, `dead_wood`, `bamboo`, `wetland`), `colour` (`"#rrggbb"`) | all | by style; a colour by id |
 | `far_color` (`"#rrggbb"`) | all | from the species' bakes |
 
-Pools are looked up by name in the profile's `species` and `dead`, then in the fallback flora's.
+A type's lane grows its own mix when `mixes` has one; else the pool its old key names, else the profile's pool named
+for the lane (`coast`, `mid`, `high`, `bush`; a grid's `orchard`; a mix's trees `mid`; the dead pools by band), then
+the fallback flora's of that name. The Types dialog's first write turns the old pool keys into own mixes; the forest
+stays the same.
 
 ## The import
 
@@ -141,7 +146,7 @@ godot --headless --script res://addons/wuifwoud/tools/import_forest.gd -- --mapp
 
 With the plugin enabled, the forest grows around the editor camera.
 
-- **The Forest menu** (3D view toolbar): *Show forest*, *Re-grow*, *Species…*.
+- **The Forest menu** (3D view toolbar): *Show forest*, *Re-grow*, *Species…*, *Types…*.
 - **The Forest workspace** (Terrain3D Extended's rail):
 
   | Tool | Does |
@@ -163,6 +168,12 @@ With the plugin enabled, the forest grows around the editor camera.
     and lines its spacing, clearance and species.
   - **Source:** the GeoJSON files, the terrain folder, the texel size and the exclusion files.
   - **Run** imports on a worker thread, with progress and Cancel; the forest regrows when it finishes.
+- **Types…** (the Forest menu, the workspace's ⋯, the library's footer) edits the open scene's flora profile: the types
+  in the library's order (drag ≡ to reorder; ids never change), + New type, Duplicate, Delete; a type's name, icon,
+  colour, style and numbers; its lanes, each its own mix or the map's default (dimmed), filled by dragging species
+  from the strip; the Bands tab. Every change is undoable in the dialog and written at once (key order and `_comment`
+  keys kept); the scene's forest follows. A profile inside Wuifwoud (the starter flora) is read-only: *Save a copy for
+  this map…*. A forest without one: *Create a profile…*.
 
 Painted maps are files beside the terrain's region files: keep them under version control or back them up.
 

@@ -7,9 +7,10 @@ extends RefCounted
 ## back to the import mapping) and Pick reads one texel. Every stroke is
 ## one undo step in that scene's history; the touched cells grow again every REGROW_EVERY_MS during a stroke and at its
 ## end. The plugin hands it the forest (`forest_of`) and the undo manager, and saves the maps with the scene. The ⋯
-## menu's Import… asks the plugin for the Import dialog; while an import runs no stroke starts (it would land in a map
-## the import copied); a stroke from before an import no longer undoes. Tree and Row place
-## single trees and rows: their strokes, hover, cursor note and panel go to ForestPlaceTools (forest_place_tools.gd).
+## menu's Types…, Species… and Import… (and the library's footer: Types…) ask the plugin for those dialogs; while an
+## import runs no stroke starts (it would land in a map the import copied); a stroke from before an import no longer
+## undoes. Tree and Row place single trees and rows: their strokes, hover, cursor note and panel go to ForestPlaceTools
+## (forest_place_tools.gd).
 
 ## A tool finished (the overlay's tool API).
 signal tool_done(tool_id: String)
@@ -19,6 +20,8 @@ signal library_changed
 signal import_requested
 ## "Species…": the plugin opens the Species dialog.
 signal species_requested
+## "Types…" (the ⋯ menu or the library's footer): the plugin opens the Types dialog.
+signal types_requested
 
 ## The texel rules.
 const ForestBrushRes := preload("res://addons/wuifwoud/forest_brush.gd")
@@ -28,6 +31,8 @@ const ForestImportRes := preload("res://addons/wuifwoud/forest_import.gd")
 const ForestLogRes := preload("res://addons/wuifwoud/forest_log.gd")
 ## The Place tools.
 const PlaceRes := preload("res://addons/wuifwoud/editor/forest_place_tools.gd")
+## The type icons and colours.
+const TypeTileRes := preload("res://addons/wuifwoud/editor/common/forest_type_tile.gd")
 ## The Revert brush's cursor note asks for the mapping and the reader at most this often.
 const REVERT_ASK_MS := 1000
 ## A cursor note older than this (ms) is dropped.
@@ -106,9 +111,14 @@ static func overlay_level(providers: Script) -> int:
 	return int(providers.get_script_constant_map().get("LEVEL", 1)) if providers != null else 0
 
 
-## A type's swatch colour: a fixed hue per id, the same in every session.
+## A type's colour by its id alone: a fixed hue per id, the same in every session (ForestTypeTile.colour_for_id).
 static func color_of(id: int) -> Color:
-	return Color.from_hsv(fposmod(float(id) * 0.618034, 1.0), 0.55, 0.85)
+	return TypeTileRes.colour_for_id(id)
+
+
+## A resolved type's colour (ForestTypes.get_type): its own, else its id's.
+static func colour_of(t: Dictionary) -> Color:
+	return TypeTileRes.colour_of(t)
 
 
 ## The editor's undo manager.
@@ -148,11 +158,15 @@ func brush_data(p_invert := false) -> Dictionary:
 	return {}
 
 
-## The brush decal's colour (the overlay's tool API).
+## The brush decal's colour (the overlay's tool API): the selected type's.
 func decal_color() -> Color:
 	if active_tool == "forest.paint" and _invert:
 		return Color(0.6, 0.6, 0.6)
-	return color_of(selected) if selected > 0 else Color.WHITE
+	if selected <= 0:
+		return Color.WHITE
+	var f := _forest()
+	var t: Dictionary = f._types.get_type(selected) if f != null else {}
+	return colour_of(t) if not t.is_empty() else color_of(selected)
 
 
 ## Where the view ray lands (provider API v3, called on every mouse event): unchanged; the Place tools hear the hover.
@@ -179,20 +193,19 @@ func _overlay_has_us() -> bool:
 	return ov.active_provider() == self
 
 
-## The library: the profile's types (the overlay's tool API).
+## The library: the profile's types in its order, each in its colour (the overlay's tool API). Its footer opens the
+## Types dialog.
 func library() -> Dictionary:
 	var f := _forest()
 	var items := []
 	var footer := "no forest in this scene"
 	if f != null:
-		var ids: Array = Array(f._types.ids())
-		ids.sort()
-		for id in ids:
+		for id in f._types.order():
 			var t: Dictionary = f._types.get_type(id)
-			items.append({"id": id, "name": String(t["name"]), "picture": _swatch(color_of(id)), "card": _card.bind(t)})
+			items.append({"id": id, "name": String(t["name"]), "picture": _swatch(colour_of(t)), "card": _card.bind(t)})
 		footer = "%d types · %s" % [items.size(), String(f.profile_path).get_file()]
 	return {"id": "types", "key": "forest.types", "placeholder": "Search types", "tool": "forest.paint",
-		"items": items, "footer": footer, "footer_action": "reload"}
+		"items": items, "footer": footer, "footer_action": "types"}
 
 
 ## A type's hover card: its style, density, clump and understory, and its road edge wall.
@@ -242,15 +255,18 @@ func build_header(box: VBoxContainer, kit: Object, _accent: Color) -> void:
 
 ## The ⋯ menu's actions.
 func workspace_actions() -> Array:
-	return [{"id": "species", "title": "Species…", "tooltip": "Every species pack: browse, edit, switch on and off, build"},
+	return [{"id": "types", "title": "Types…", "tooltip": "This map's forest types: their settings, icons and species mixes"},
+		{"id": "species", "title": "Species…", "tooltip": "Every species pack: browse, edit, switch on and off, build"},
 		{"id": "import", "title": "Import…", "tooltip": "This map's import mapping: edit it and run the import"},
 		{"id": "restore", "title": "Restore deleted imports", "tooltip": "Bring back the single trees and rows deleted from the import"},
-		{"id": "reload", "title": "Reload types", "tooltip": "Read the flora profile again and re-grow the forest"},
 		{"id": "regrow", "title": "Re-grow all", "tooltip": "Grow the whole preview again from the maps"}]
 
 
 ## Run a ⋯ menu action.
 func workspace_action(p_id: String) -> void:
+	if p_id == "types":
+		types_requested.emit()
+		return
 	if p_id == "species":
 		species_requested.emit()
 		return
@@ -263,10 +279,7 @@ func workspace_action(p_id: String) -> void:
 	var f := _forest()
 	if f == null:
 		return
-	if p_id == "reload":
-		f.reload_types()
-		library_changed.emit()
-	elif p_id == "regrow":
+	if p_id == "regrow":
 		f.regrow_all()
 
 

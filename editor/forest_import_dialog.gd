@@ -788,7 +788,7 @@ static func context_for(forest: Node, p_kit: Object) -> Dictionary:
 	ids.sort()
 	for id in ids:
 		ctx["types"].append({"id": id, "name": String(forest._types.get_type(id).get("name", "type %d" % id)),
-			"colour": ProviderRes.color_of(id)})
+			"colour": ProviderRes.colour_of(forest._types.get_type(id))})
 	ctx["species"] = Array(forest.species_names())
 	if ctx["path"] != "" and FileAccess.file_exists(ctx["path"]):
 		var m = MappingRes.new()

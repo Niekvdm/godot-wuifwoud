@@ -978,7 +978,7 @@ func regrow_all() -> void:
 		_far.rebuild_all(false)
 
 
-## The flora profile read again (the Forest workspace's Reload types): the types, the maps' summary ids and every
+## The flora profile read again (the Types dialog wrote it): the types, the maps' summary ids and every
 ## held map's summary, then every cell grows again. The jobs in flight finish first: their workers read `_types`, which
 ## is swapped here, and a map summary built with the old ids must not land after the re-summary.
 func reload_types() -> void:

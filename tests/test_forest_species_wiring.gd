@@ -39,8 +39,8 @@ static func run() -> Dictionary:
 	p.species_requested.connect(func() -> void: opened[0] += 1)
 	var acts: Array = p.workspace_actions().map(func(a): return a["id"])
 	p.workspace_action("species")
-	_chk(r, "the workspace's ⋯ has Species… first (%s)" % str(acts),
-		acts == ["species", "import", "restore", "reload", "regrow"] and opened[0] == 1)
+	_chk(r, "the workspace's ⋯ has Species… after Types… (%s)" % str(acts),
+		acts == ["types", "species", "import", "restore", "regrow"] and opened[0] == 1)
 	var fx := Fix.make(ROOT)
 	var got := ["?"]
 	var panel: Control = InspRes.panel_for(fx["fixture"].species[0], func(id: String) -> void: got[0] = id)

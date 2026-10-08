@@ -10,6 +10,12 @@
   building once.
 - `ForestConfig.disabled_species`: a species switched off leaves every mix (the rest share its weight); a single tree
   pinned to it grows its type's pick.
+- The Types dialog (Forest → Types…, the workspace's ⋯ and the library's footer): a map's forest types and their
+  species mixes, a lane inheriting the map's default mix, the bands. It replaces Reload types.
+- Type icons and colours: ten glyphs on the type's colour; a type's `icon` and `colour` in the flora profile.
+- A type's own `mixes` in the flora profile; the Types dialog's first write turns a type's old pool keys (`pools`,
+  `bush_pool`, `pool`, `tree_pool`, `dead`) into them, growing the same forest.
+- The workspace library lists the types in the profile's order.
 
 ## 1.0.0 (2026-10-08)
 
