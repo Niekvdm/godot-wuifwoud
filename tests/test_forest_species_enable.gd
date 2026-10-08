@@ -79,6 +79,16 @@ static func run() -> Dictionary:
 	_chk(r, "the tile's menu switches it", not d.config.disabled_species.has("W_Bush"))
 	d.tile_menu_action("W_New", d.TILE_BUILD)
 	_chk(r, "and builds it", runner.calls.back()[1] == {"force": true, "only": ["W_New"]})
+	runner.job.running = false
+	d._process(0.0)
+	d.tile_menu_action("W_Bush", d.TILE_REMOVE, fx["other"])
+	var has_bush := func(pk) -> bool: return (pk.species as Array).any(func(x): return String(x.id) == "W_Bush")
+	_chk(r, "a tile's Remove takes it out of the pack the tile is in, not the first that lists the id",
+		not has_bush.call(fx["other"]) and has_bush.call(fx["fixture"]))
+	d.undo()
+	d.tile_menu_action("W_Bush", d.TILE_BUILD, fx["other"])
+	_chk(r, "a tile's Build builds the pack the tile is in", runner.calls.back()[0] == [fx["other"]]
+		and runner.calls.back()[1] == {"force": true, "only": ["W_Bush"]})
 	d.free()
 	Fix.TreeFix.rm_tree(ROOT)
 	return r

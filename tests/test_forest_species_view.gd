@@ -38,6 +38,10 @@ static func run() -> Dictionary:
 	v.show_species(pack.species[0], dir, man, "built")
 	var model := v.find_child("Model", true, false) as MeshInstance3D
 	_chk(r, "a built species drawn as the forest draws it", model != null and model.mesh == v.levels()[0] and v.tris(0) > 0)
+	var nc = (v.parts["card"]["mat"] as ShaderMaterial).get_shader_parameter("near_cut")
+	var lo = ((v.parts["combined"] as ArrayMesh).surface_get_material(0) as ShaderMaterial).get_shader_parameter("lod_out0")
+	_chk(r, "the card and the model draw at every distance the view reaches (the forest's hand-over cuts are off) (%s, %s)"
+		% [str(nc), str(lo)], nc != null and float(nc) == 0.0 and lo != null and float(lo) >= 1.0e5)
 	v.set_alpha_cut(0.2)
 	var c: ArrayMesh = v.parts["combined"]
 	_chk(r, "the alpha cut moves the leaves only",

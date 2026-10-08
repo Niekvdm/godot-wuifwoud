@@ -230,6 +230,7 @@ static func _settings(d, v: VBoxContainer, sp) -> void:
 	me.text = String(sp.mesh)
 	me.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	me.text_submitted.connect(func(t: String) -> void: d.set_field(sp, "mesh", t))
+	me.focus_exited.connect(func() -> void: d.set_field(sp, "mesh", me.text))
 	mrow.add_child(me)
 	var mp: Button = d.kit.chip("…", false, d.accent)
 	mp.name = "MeshPick"
@@ -275,6 +276,8 @@ static func _slider(d, sp, nm: String, label: String, field: String, lo: float, 
 	var row: VBoxContainer = d.kit.slider_row(label, lo, hi, step, float(sp.get(field)), suffix, d.accent)
 	row.name = nm
 	var s := row.get_node("Slider") as HSlider
+	# It writes when a drag ends; the mouse wheel would move it without one (and steal the column's scrolling).
+	s.scrollable = false
 	s.drag_ended.connect(func(moved: bool) -> void:
 		if moved:
 			d.set_field(sp, field, s.value))
@@ -302,6 +305,7 @@ static func _texture_row(d, sp, field: String, label: String) -> Control:
 	e.text = path
 	e.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	e.text_submitted.connect(func(t: String) -> void: d.set_field(sp, field, t))
+	e.focus_exited.connect(func() -> void: d.set_field(sp, field, e.text))
 	h.add_child(e)
 	var p: Button = d.kit.chip("…", false, d.accent)
 	p.name = "Pick"

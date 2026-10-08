@@ -41,6 +41,9 @@ static func run() -> Dictionary:
 	# ── a slider, written and undone ──
 	var row := d.find_child("TrunkRadius", true, false) as VBoxContainer
 	var s := row.get_node("Slider") as HSlider
+	var ac := (d.find_child("AlphaCut", true, false) as Node).get_node("Slider") as HSlider
+	_chk(r, "the sliders take no mouse wheel (it would move one without a write; the wheel scrolls the column)",
+		not s.scrollable and not ac.scrollable)
 	s.value = 0.5
 	s.drag_ended.emit(true)
 	_chk(r, "Trunk radius let go: written to its file", is_equal_approx(_disk(path).trunk_radius, 0.5))
@@ -56,6 +59,20 @@ static func run() -> Dictionary:
 	var back := _disk(path)
 	_chk(r, "the display name, the kind and the crown written (%s, %s, %s)" % [back.display_name, back.kind, back.crown],
 		back.display_name == "Fixture tree" and back.kind == "bush" and back.crown == "palm")
+	# A typed name whose field loses its focus because a rebuild takes it down (a click on a tile, Build, a mode): the
+	# edit lands once the rebuild is done (the dialog applies it deferred; called here, a suite draws no frame).
+	var dn2 := d.find_child("DisplayName", true, false) as LineEdit
+	dn2.text = "Taken down"
+	d._rebuilding = true
+	dn2.focus_exited.emit()
+	d._rebuilding = false
+	d._apply_pending()
+	_chk(r, "a name committed by a rebuild taking its field down is written (%s)" % _disk(path).display_name,
+		_disk(path).display_name == "Taken down")
+	var tp := (d.find_child("Tex_bark_normal", true, false) as Node).get_node("Path") as LineEdit
+	tp.text = "res://addons/wuifwoud/tests/fixtures/x_n.png"
+	tp.focus_exited.emit()
+	_chk(r, "a path field writes when it loses focus", _disk(path).bark_normal == "res://addons/wuifwoud/tests/fixtures/x_n.png")
 
 	# ── leaf materials, an empty albedo ──
 	var bark := d.find_child("Leaf_Bark", true, false) as Button

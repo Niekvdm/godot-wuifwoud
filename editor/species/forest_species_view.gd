@@ -32,6 +32,8 @@ const DEFAULT_YAW := 35.0
 const DEFAULT_PITCH := 18.0
 ## The camera's field of view (degrees).
 const FOV_DEG := 35.0
+## A distance past anything the view reaches (m): the hand-over cuts on the view's own materials sit there.
+const NO_CUT_M := 1.0e6
 
 ## The mode.
 var mode := "model"
@@ -183,9 +185,27 @@ func show_species(p_sp, dir: String, man: Dictionary, state := "built") -> void:
 	sp = p_sp
 	_state = state
 	parts = VA.view_parts(sp, dir, man) if sp != null else {}
+	_uncut()
 	lod = clampi(lod, 0, maxi(levels().size() - 1, 0))
 	dist = 0.0
 	_place()
+
+
+## The view's own materials draw at every distance it reaches. The forest pushes its hand-over to its materials; these
+## sit on the shader defaults (the card's near cut at 810 m, the mesh fading out over 260-350 m), which would leave Card
+## and Compare without a card and drop the model past 350 m.
+func _uncut() -> void:
+	var c: ArrayMesh = parts.get("combined")
+	if c != null:
+		for si in c.get_surface_count():
+			var m := c.surface_get_material(si) as ShaderMaterial
+			if m != null:
+				m.set_shader_parameter("lod_out0", NO_CUT_M)
+				m.set_shader_parameter("lod_out1", NO_CUT_M + 1.0)
+	var cm := (parts.get("card", {}) as Dictionary).get("mat") as ShaderMaterial
+	if cm != null:
+		cm.set_shader_parameter("near_cut", 0.0)
+		cm.set_shader_parameter("near_fade", 0.001)
 
 
 ## The levels drawn (the authored chain, else the combined mesh).

@@ -109,6 +109,7 @@ var _watch = null
 var _panel: PanelContainer
 var _content: VBoxContainer
 var _rebuilding := false
+var _pending: Array = []          # [species, field, value] handed to set_field during a rebuild: applied after it
 ## The 3D view of the selected species, kept across rebuilds (its preparation is not cheap).
 var view: Control = null
 var _view_key := ""
@@ -234,6 +235,15 @@ func rows_of(id: String) -> Array:
 				out.append({"id": id, "s": row["s"], "state": row["state"], "why": row["why"], "pack": pr["pack"],
 					"dir": pr["pack"].built_dir(), "enabled": bool(pr["enabled"]), "src": pr["src"]})
 	return out
+
+
+## The row of species `id` in `pack` (null, or a pack that does not list it: the first row) ({} : none).
+func row_in(id: String, pack) -> Dictionary:
+	if pack != null:
+		for row in rows_of(id):
+			if row["pack"] == pack:
+				return row
+	return row_of(id)
 
 
 ## The first row of species `id` ({} : none).
@@ -502,11 +512,11 @@ func cancel_question() -> void:
 	rebuild()
 
 
-## The tile menu of species `id` at screen position `at`.
-func open_tile_menu(id: String, at: Vector2) -> void:
+## The tile menu of species `id` (its tile in `pack`; null: the first pack that lists it) at screen position `at`.
+func open_tile_menu(id: String, at: Vector2, pack = null) -> void:
 	if _tile_menu != null and is_instance_valid(_tile_menu):
 		_tile_menu.queue_free()
-	var row := row_of(id)
+	var row := row_in(id, pack)
 	if row.is_empty():
 		return
 	_tile_menu = PopupMenu.new()
@@ -516,24 +526,25 @@ func open_tile_menu(id: String, at: Vector2) -> void:
 	_tile_menu.add_item("Remove from pack", TILE_REMOVE)
 	_tile_menu.set_item_disabled(_tile_menu.item_count - 1, is_read_only(row["pack"]))
 	_tile_menu.add_item("Show in FileSystem", TILE_SHOW)
-	_tile_menu.id_pressed.connect(func(item: int) -> void: tile_menu_action(id, item))
+	_tile_menu.id_pressed.connect(func(item: int) -> void: tile_menu_action(id, item, pack))
 	add_child(_tile_menu)
 	_tile_menu.popup(Rect2i(Vector2i(at), Vector2i.ZERO))
 
 
-## A tile menu item picked for species `id`.
-func tile_menu_action(id: String, item: int) -> void:
+## A tile menu item picked for species `id`, its tile in `pack` (null: the first pack that lists it). Enable and Disable
+## act on the id (every pack's row); Build, Remove and Show on the tile's pack.
+func tile_menu_action(id: String, item: int, pack = null) -> void:
 	match item:
 		TILE_TOGGLE:
 			set_species_enabled(id, config.disabled_species.has(id))
 		TILE_BUILD:
-			build_species(id)
+			build_species(id, pack)
 		TILE_REMOVE:
-			var rr := row_of(id)
+			var rr := row_in(id, pack)
 			if not rr.is_empty():
 				remove_from_pack(id, rr["pack"])
 		TILE_SHOW:
-			var row := row_of(id)
+			var row := row_in(id, pack)
 			if not row.is_empty() and show_file.is_valid():
 				show_file.call(String(row["s"].resource_path) if String(row["s"].resource_path) != ""
 					else String(row["pack"].resource_path))
@@ -541,6 +552,13 @@ func tile_menu_action(id: String, item: int) -> void:
 
 ## Field `field` of species `sp` set to `value`: one undo step (its file written). A read-only species changes nothing.
 func set_field(sp, field: String, value) -> void:
+	if _rebuilding:
+		# A text field losing its focus because this rebuild takes it down (a click on a tile, Build, a mode): its edit
+		# is applied once the rebuild is done, not dropped.
+		_pending.append([sp, field, value])
+		if _pending.size() == 1:
+			_apply_pending.call_deferred()
+		return
 	var row := row_of(String(sp.id))
 	if not row.is_empty() and is_read_only(row["pack"]):
 		return
@@ -558,6 +576,14 @@ func set_field(sp, field: String, value) -> void:
 		view.set_alpha_cut(float(value))
 	elif view != null and field == "trunk_radius":
 		view.set_trunk(float(value))
+
+
+## The edits set_field was handed during a rebuild, applied now.
+func _apply_pending() -> void:
+	var todo := _pending
+	_pending = []
+	for e in todo:
+		set_field(e[0], String(e[1]), e[2])
 
 
 ## A file (or folder) from the plugin's picker; `on_pick` gets its path.
@@ -584,14 +610,22 @@ func add_species_from(pack, path: String) -> bool:
 		for s in pr["pack"].species:
 			if s != null:
 				taken[String(s.id)] = true
+	# A species taken out of its pack keeps its file: a new one never takes that file's name.
+	var folder := AddRes.species_path(pack, "x").get_base_dir()
+	for f in DirAccess.get_files_at(folder):
+		if f.ends_with(".tres"):
+			taken[f.get_basename()] = true
 	var sp: ForestSpecies = AddRes.make(path, taken)
 	var file := AddRes.species_path(pack, String(sp.id))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(file.get_base_dir()))
-	var e := ResourceSaver.save(sp, file, ResourceSaver.FLAG_CHANGE_PATH)
+	var e := ResourceSaver.save(sp, file)
 	if e != OK:
 		error = "Could not write %s (%s)" % [file, error_string(e)]
 		rebuild()
 		return false
+	# Its file is its home from now on: the pack names it by path (ResourceSaver's FLAG_CHANGE_PATH leaves the path as it
+	# was, and the pack would embed a copy the file never sees again).
+	sp.take_over_path(file)
 	selected = String(sp.id)
 	return change(func() -> String:
 		var arr: Array[ForestSpecies] = []
@@ -722,9 +756,9 @@ func build_pack(pack) -> void:
 	_launch([pack], {"force": false})
 
 
-## Build species `id` (its first pack), forced.
-func build_species(id: String) -> void:
-	var row := row_of(id)
+## Build species `id` of `pack` (null: its first pack), forced.
+func build_species(id: String, pack = null) -> void:
+	var row := row_in(id, pack)
 	if not row.is_empty():
 		_launch([row["pack"]], {"force": true, "only": [id]})
 

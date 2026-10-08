@@ -71,9 +71,17 @@ static func run() -> Dictionary:
 	_chk(r, "saved in its pack's species/, added to the pack, selected (%s)" % d.selected,
 		added is ForestSpecies and (added as ForestSpecies).crown == "conifer" and (added as ForestSpecies).bark_albedo == tex[0]
 		and on_disk.species.size() == 5 and d.selected == "pine")
+	_chk(r, "the new species lives in its own file: the pack names it by path (%s)" % String(pack.species.back().resource_path),
+		String(pack.species.back().resource_path) == file
+		and FileAccess.get_file_as_string(pack.resource_path).contains('path="%s"' % file))
 	d.undo()
 	on_disk = ResourceLoader.load(fx["fixture"].resource_path, "", ResourceLoader.CACHE_MODE_IGNORE) as ForestSpeciesPack
 	_chk(r, "undo takes it out of the pack and leaves its file", on_disk.species.size() == 4 and FileAccess.file_exists(file))
+	var kept := FileAccess.get_md5(file)
+	d.add_species_from(pack, ROOT + "/m/pine.tscn")
+	_chk(r, "the same mesh added again takes a new id: the file kept for the one taken out stays as it was (%s)" % d.selected,
+		d.selected == "pine_2" and FileAccess.get_md5(file) == kept and FileAccess.file_exists(ROOT + "/fixture/species/pine_2.tres"))
+	d.undo()
 
 	# ── remove from pack ──
 	d.remove_from_pack("W_New", pack)
