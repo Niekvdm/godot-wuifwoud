@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: MIT
 @tool
 extends RefCounted
-## The Species dialog's right column: the selected species, its name and id, its state and its Build. (The settings, the
-## files, what uses it, the switch and the 3D view join it.)
+## The Species dialog's right column: the selected species' 3D view (the dialog's, kept across rebuilds), then, scrolling,
+## its name and id, its state, its Build and its switch, the question asked before it is switched off, its settings
+## (shape and files; none for the read-only starter), what uses it and its pack's credits.
 
 ## The tile's caption rule.
 const TileCaption := preload("res://addons/wuifwoud/editor/common/forest_species_tile.gd")
@@ -24,15 +25,29 @@ const TEX_FILTERS := ["*.png, *.jpg, *.jpeg, *.tga, *.webp, *.exr, *.dds, *.ktx 
 
 ## The column for the dialog `d`.
 static func build(d) -> Control:
-	var v := VBoxContainer.new()
-	v.name = "Species"
-	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v.add_theme_constant_override("separation", 6)
 	var row: Dictionary = d.row_of(d.selected) if d.selected != "" else {}
 	if row.is_empty():
-		v.add_child(d.hint("Select a species."))
-		return v
+		var empty := VBoxContainer.new()
+		empty.name = "Species"
+		empty.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		empty.add_child(d.hint("Select a species."))
+		return empty
 	var sp = row["s"]
+	var outer: BoxContainer = HBoxContainer.new() if d.inspecting else VBoxContainer.new()
+	outer.name = "Species"
+	outer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	outer.add_theme_constant_override("separation", 10)
+	outer.add_child(_view_block(d, sp))
+	var sc := ScrollContainer.new()
+	sc.name = "SettingsScroll"
+	sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_theme_constant_override("separation", 6)
+	sc.add_child(v)
+	outer.add_child(sc)
 	var head := HBoxContainer.new()
 	head.name = "Head"
 	head.add_theme_constant_override("separation", 8)
@@ -97,7 +112,44 @@ static func build(d) -> Control:
 		var cr: Label = d.hint(String(pack.credits))
 		cr.name = "Credits"
 		v.add_child(cr)
-	return v
+	return outer
+
+
+## The 3D view, its mode and its level.
+static func _view_block(d, sp) -> Control:
+	var vb := VBoxContainer.new()
+	vb.name = "ViewBlock"
+	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var view: Control = d.view_for_selected()
+	view.custom_minimum_size.y = 190.0
+	view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vb.add_child(view)
+	var bar := HBoxContainer.new()
+	bar.name = "ViewBar"
+	var modes := ["model", "card"]
+	var seg: HBoxContainer = d.kit.segmented(["Model", "Card"], maxi(modes.find(view.mode), 0), d.accent,
+		func(i: int) -> void:
+			view.set_mode(modes[i])
+			d.rebuild())
+	seg.name = "Modes"
+	bar.add_child(seg)
+	if view.levels().size() > 1:
+		var names := []
+		for i in view.levels().size():
+			names.append("LOD%d" % i)
+		var ls: HBoxContainer = d.kit.segmented(names, view.lod, d.accent, func(i: int) -> void:
+			view.set_lod(i)
+			d.rebuild())
+		ls.name = "Lods"
+		bar.add_child(ls)
+	var tl := Label.new()
+	tl.name = "Tris"
+	tl.text = "%s tris" % String.num_int64(view.tris(view.lod))
+	tl.modulate = d.DIM
+	tl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.add_child(tl)
+	vb.add_child(bar)
+	return vb
 
 
 ## "built", "needs building: <why>", "not built", "mesh missing: <why>".

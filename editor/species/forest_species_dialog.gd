@@ -24,6 +24,8 @@ const TreeRes := preload("res://addons/wuifwoud/editor/species/forest_species_tr
 const PanelRes := preload("res://addons/wuifwoud/editor/species/forest_species_panel.gd")
 ## The species pictures.
 const PicturesRes := preload("res://addons/wuifwoud/editor/common/forest_pictures.gd")
+## The 3D view.
+const ViewRes := preload("res://addons/wuifwoud/editor/species/forest_species_view.gd")
 ## Add species.
 const AddRes := preload("res://addons/wuifwoud/editor/species/forest_species_add.gd")
 ## The mesh files a species takes.
@@ -105,6 +107,9 @@ var _watch = null
 var _panel: PanelContainer
 var _content: VBoxContainer
 var _rebuilding := false
+## The 3D view of the selected species, kept across rebuilds (its preparation is not cheap).
+var view: Control = null
+var _view_key := ""
 
 
 ## The context (context_for's, the plugin's callables); builds the view.
@@ -540,9 +545,17 @@ func set_field(sp, field: String, value) -> void:
 	var was = sp.get(field)
 	if typeof(was) == typeof(value) and was == value:
 		return
-	change(func() -> String:
+	var live := field == "alpha_cut" or field == "trunk_radius"
+	if not live:
+		_view_key = ""          # the view prepares it again in the rebuild the change makes
+	if not change(func() -> String:
 		sp.set(field, value)
-		return "")
+		return ""):
+		return
+	if view != null and field == "alpha_cut":
+		view.set_alpha_cut(float(value))
+	elif view != null and field == "trunk_radius":
+		view.set_trunk(float(value))
 
 
 ## A file (or folder) from the plugin's picker; `on_pick` gets its path.
@@ -783,9 +796,26 @@ func rebuild() -> void:
 		_show_progress()
 
 
-## Nodes kept across rebuilds (the 3D view, Task 10) taken out of the old tree first.
+## Nodes kept across rebuilds (the 3D view) taken out of the old tree first.
 func _detach_kept() -> void:
-	pass
+	if view != null and view.get_parent() != null:
+		view.get_parent().remove_child(view)
+
+
+## The view of the selected species: made once, shown again when the selection or its state moved.
+func view_for_selected() -> Control:
+	if view == null:
+		view = ViewRes.new()
+		view.name = "View"
+	var row := row_of(selected)
+	var key := "%s|%s" % [selected, String(row.get("state", ""))]
+	if key != _view_key:
+		_view_key = key
+		if row.is_empty():
+			view.show_species(null, "", {})
+		else:
+			view.show_species(row["s"], String(row["dir"]), BuildRes.read_manifest(String(row["dir"])), String(row["state"]))
+	return view
 
 
 func _header() -> Control:
@@ -928,6 +958,9 @@ static func box(bg: Color, border := Color(0, 0, 0, 0)) -> StyleBoxFlat:
 ## Close the dialog (a running build carries on).
 func close() -> void:
 	closed.emit()
+	if view != null:
+		view.queue_free()
+		view = null
 	queue_free()
 
 
