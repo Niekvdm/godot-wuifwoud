@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: MIT
 extends RefCounted
 ## The species picker: what it offers (the forest's species and every species the packs grow, each once, by name); its
-## face (By type, or the species' picture and name; a pin that grows nowhere in red, saying why); its popover (By type
-## first, a tile a species, the one picked framed, a pin that grows nowhere offered and framed red); the search (by id
-## or name, the grid alone filled again); a pick (the face, the popover closed, `picked`); a tile's click lands after
-## its input is done.
+## face (By type, or the species' picture and name; a pin that grows nowhere or whose mesh is missing in red, saying
+## why, and picking another from it); its popover (By type first, a tile a species, the one picked framed, a pin that
+## grows nowhere offered and framed red, a missing mesh's badge); the search (by id or name, the grid alone filled
+## again); a pick (the face, the popover closed, `picked`); a tile's click lands after its input is done.
 ##
 ## Run with a unit-suite runner: static run() returns {name, passed, failed, details}.
 
@@ -62,8 +62,24 @@ static func run() -> Dictionary:
 		off_pk.get_theme_color("font_color") == PickerRes.ERROR and String(off_pk.tooltip_text).contains("switched off")
 		and String(gone_pk.tooltip_text).contains("in no species pack") and off_tile != null
 		and off_tile.tooltip_text.contains("switched off") and off_tile.has_theme_stylebox_override("normal"))
+	var back := []
+	off_pk.picked.connect(func(id: String) -> void: back.append(id))
+	(off_pk.find_child("Species_W_Bush", true, false) as Button).pressed.emit()
+	await _frames(2)
+	_chk(r, "from a pin that grows nowhere, picking another works: the face is no longer red (%s)" % str(back),
+		back == ["W_Bush"] and String(off_pk.text) == "W Bush ▾" and not off_pk.has_theme_color_override("font_color"))
 	off_pk.free()
 	gone_pk.free()
+	# ── a species whose mesh is missing ──
+	var miss_pk = PickerRes.new().setup(KitRes.new(null), "W_Missing", offered, ACC)
+	miss_pk.open()
+	var miss_tile: Node = miss_pk.find_child("Species_W_Missing", true, false)
+	var miss_badge: Label = miss_tile.get_node_or_null("Badge") if miss_tile != null else null
+	_chk(r, "a species whose mesh is missing: the face in red says so, its tile wears the red badge (%s; %s)" % [
+		String(miss_pk.tooltip_text), miss_badge.text if miss_badge != null else "no badge"],
+		PickerRes.why("W_Missing").contains("mesh") and miss_pk.get_theme_color("font_color") == PickerRes.ERROR
+		and miss_badge != null and miss_badge.text == "mesh missing")
+	miss_pk.free()
 	# ── the popover ──
 	pk.open()
 	var pop: PopupPanel = pk.find_child("NewSpeciesPop", true, false)

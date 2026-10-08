@@ -6,7 +6,8 @@ extends Button
 ## picture and name, or By type (the forest type picks); a click opens a popover under it, a grid of picture tiles with
 ## a search and By type first. A tile clicked closes the popover and is `picked` (its id, "" for By type) once that
 ## click's input is done, so an owner that rebuilds on a pick never takes the popover out of the tree under the mouse.
-## A species that grows nowhere (switched off, or in no pack) is red and says why; one picked already stays offered.
+## A species that grows nowhere (switched off, or in no pack) or whose mesh is missing is red and says why; one picked
+## already stays offered.
 
 ## A species picked ("": By type).
 signal picked(id: String)
@@ -21,6 +22,8 @@ const SpeciesTileRes := preload("res://addons/wuifwoud/editor/common/forest_spec
 const TypeTileRes := preload("res://addons/wuifwoud/editor/common/forest_type_tile.gd")
 ## The forest's species.
 const VA := preload("res://addons/wuifwoud/forest_assets.gd")
+## A species (its mesh path, resolved).
+const SpeciesRes := preload("res://addons/wuifwoud/species/forest_species.gd")
 ## What By type is called.
 const BY_TYPE := "By type"
 ## By type's tile: the mixed glyph on grey (the type picks).
@@ -102,11 +105,21 @@ static func picture_of(id: String) -> Texture2D:
 	return TypeTileRes.texture("mixed", BY_TYPE_COLOUR, 64) if id == "" else PicturesRes.of_id(id)
 
 
-## Why species `id` grows nowhere ("" when it grows, and for By type): "switched off", or "in no species pack".
+## What is wrong with species `id` ("" when nothing, and for By type): switched off or in no species pack (its type
+## picks), or its mesh is missing.
 static func why(id: String) -> String:
-	if id == "" or VA.species_of(id) != null:
+	if id == "":
 		return ""
-	return "switched off" if VA.is_disabled(id) else "in no species pack"
+	var sp = VA.species_of(id)
+	if sp == null:
+		return ("switched off" if VA.is_disabled(id) else "in no species pack") + ": its type picks"
+	return "" if mesh_found(sp) else "its mesh is missing"
+
+
+## Whether species `sp`'s mesh resolves to a file.
+static func mesh_found(sp) -> bool:
+	var m := SpeciesRes.resolve(String(sp.mesh))
+	return m != "" and ResourceLoader.exists(m)
 
 
 ## The species the popover shows: those offered (the one picked first when it is not), narrowed by the search (id or
@@ -160,7 +173,7 @@ func _face() -> void:
 	var w := why(current)
 	icon = picture_of(current)
 	text = caption_of(current) + " ▾"
-	tooltip_text = ("Species: %s" % caption_of(current)) + ((" (%s: its type picks)" % w) if w != "" else "")
+	tooltip_text = ("Species: %s" % caption_of(current)) + ((" (%s)" % w) if w != "" else "")
 	if w != "":
 		add_theme_color_override("font_color", ERROR)
 	else:
@@ -207,16 +220,19 @@ func _fill() -> void:
 		_grid.add_child(_tile(String(id)))
 
 
-## A species' tile: its picture tile; one that grows nowhere framed red, saying why.
+## A species' tile: its picture tile, a missing mesh's badge; one that grows nowhere framed red; each saying why.
 func _tile(id: String) -> Button:
 	var sp = VA.species_of(id)
 	var t: Button
 	if sp != null:
-		t = SpeciesTileRes.new().setup(kit, sp, VA.built_dir_of(id), "built", true, id == current, accent, TILE_PX)
+		var state := "built" if mesh_found(sp) else "missing"
+		t = SpeciesTileRes.new().setup(kit, sp, VA.built_dir_of(id), state, true, id == current, accent, TILE_PX)
+		if state == "missing":
+			t.tooltip_text = "%s (%s): %s" % [caption_of(id), id, why(id)]
 	else:
 		t = kit.tile(PicturesRes.glyph("broadleaf"), caption_of(id), ERROR, TILE_PX)
 		kit.set_tile_selected(t, true)
-		t.tooltip_text = "%s (%s): %s, its type picks" % [caption_of(id), id, why(id)]
+		t.tooltip_text = "%s (%s): %s" % [caption_of(id), id, why(id)]
 	t.name = prefix + "Species_" + id.validate_node_name()
 	t.pressed.connect(_on_tile.bind(id))
 	return t
