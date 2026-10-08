@@ -400,6 +400,9 @@ static func run() -> Dictionary:
 	ic._ensure_maps(ict)
 	_chk(r, "the forest reads its trees file from its own maps folder when the maps are configured (%s)" % ic.trees.path,
 		ic.trees.path == "user://wf_b2c_scatter/forest/trees.json" and ic.trees.items.size() == 1)
+	var said_maps: Array = cap.lines.filter(func(l): return String(l[1]).contains("no forest maps in user://wf_b2c_scatter"))
+	_chk(r, "a forest with single trees but no maps says only they grow, not that nothing does (%s)" % str(said_maps),
+		said_maps.size() == 1 and String(said_maps[0][1]).contains("only its single trees and rows grow"))
 	gt.free()
 	ict.free()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://wf_b2c_scatter/forest/trees.json"))

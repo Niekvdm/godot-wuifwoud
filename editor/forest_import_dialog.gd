@@ -77,6 +77,8 @@ var maps_dir := ""
 var types: Array = []
 ## The profile's species (the inspector's picker)
 var species: Array = []
+## The profile's file name, for what a type the profile lacks is not in ("": "the profile").
+var profile_file := ""
 ## ForestSourceReader, shared with the Revert brush.
 var reader: RefCounted = null
 ## (doc: Dictionary, discard: bool) -> String: "" when started, else why not.
@@ -123,6 +125,7 @@ func setup(p: Dictionary) -> void:
 	maps_dir = String(p.get("maps_dir", ""))
 	types = p.get("types", [])
 	species = p.get("species", [])
+	profile_file = String(p.get("profile", ""))
 	reader = p.get("reader")
 	run = p.get("run", Callable())
 	job_of = p.get("job_of", Callable())
@@ -521,7 +524,7 @@ func type_name(id: int) -> String:
 	for t in types:
 		if int(t["id"]) == id:
 			return String(t["name"])
-	return "type %d: not in the profile" % id
+	return "type %d: not in %s" % [id, profile_file if profile_file != "" else "the profile"]
 
 
 ## A type's colour.
@@ -800,7 +803,7 @@ static func mapping_path(forest: Node) -> String:
 ## profile's types (in its order, each with its colour and icon). The plugin adds reader, run, job_of and pick_file.
 static func context_for(forest: Node, p_kit: Object) -> Dictionary:
 	var ctx := {"kit": p_kit, "mapping": null, "scene": "", "saved": true, "path": "", "load_error": "",
-		"terrain_dir": "", "maps_dir": "", "types": [], "species": []}
+		"terrain_dir": "", "maps_dir": "", "types": [], "species": [], "profile": ""}
 	if forest == null:
 		return ctx
 	var root: Node = forest.owner if forest.owner != null else forest
@@ -817,6 +820,7 @@ static func context_for(forest: Node, p_kit: Object) -> Dictionary:
 		ctx["types"].append({"id": id, "name": String(ty.get("name", "type %d" % id)), "colour": ProviderRes.colour_of(ty),
 			"icon": TypeTileRes.icon_for(ty)})
 	ctx["species"] = Array(forest.species_names())
+	ctx["profile"] = String(forest.profile_path).get_file()
 	if ctx["path"] != "" and FileAccess.file_exists(ctx["path"]):
 		var m = MappingRes.new()
 		var e: Error = m.load_file(ctx["path"])

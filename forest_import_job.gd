@@ -38,9 +38,9 @@ const STAGING := ".importing"
 var mapping: Dictionary
 ## Overwrite texels painted by hand (and drop the edits and removals of imported trees).
 var discard_painted := false
-## Vector2i -> Image: the editor's unsaved maps (copies), newer than the files.
+## Vector2i -> Image: the editor's unsaved maps (copies), newer than the files; let go when the run ends.
 var edits := {}
-## The editor's unsaved trees (ForestTrees.state()), newer than the file; null: none.
+## The editor's unsaved trees (ForestTrees.state()), newer than the file; null: none; let go when the run ends.
 var trees_edit = null
 ## The terrain's regions (region_meta's shape); empty: read from data_directory.
 var meta := {}
@@ -243,7 +243,7 @@ func _work() -> void:
 	if _cancelled():
 		out["cancelled"] = true
 		return
-	_set_progress("trees", 0, 0)
+	_set_progress("trees", regions.size(), regions.size())   # the regions' count kept: the run ends at N of N
 	_stage_trees(out, feats, zones, dir, stage)
 
 
@@ -305,8 +305,9 @@ func _end() -> void:
 		"unmatched_lines": {}, "unmatched_points": {}, "trees_file": "unchanged", "trees_reload": false}
 	var stopped: bool = rep["cancelled"] or not (rep["errors"] as Array).is_empty()
 	var swap_failed := false
+	var total := int(_progress.get("total", 0))   # the regions: the swap and the end keep it, so the end reads N of N
 	if not stopped:
-		_set_progress("swap", 0, 0)
+		_set_progress("swap", 0, total)
 		var staged: Dictionary = out["staged"]
 		for loc in staged:
 			var to := ProjectSettings.globalize_path(dir.path_join(Terrain3DUtil.location_to_filename(loc)))
@@ -354,7 +355,8 @@ func _end() -> void:
 	rep["ms"] = Time.get_ticks_msec() - int(out.get("t0", Time.get_ticks_msec()))
 	report = rep
 	_running = false
-	var total := int(_progress.get("total", 0))
+	edits = {}            # the editor's copies of its unsaved maps and trees: the run is over
+	trees_edit = null
 	_set_progress("done", total, total)
 	finished.emit(rep)
 

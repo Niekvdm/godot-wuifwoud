@@ -736,7 +736,7 @@ var _seen_generation := 0      # the maps' generation the ring last grew from (a
 var _seen_trees_generation := 0   # the trees' generation the ring last grew from (an import moves it)
 var _species_warned := {}         # a pinned species no pack has: said once
 var _type_warned := {}            # an item's type the profile lacks: said once
-var _items_planted := 0           # item trees the scatter handed the mesh ring (debug_churn)
+var _items_planted := 0           # item trees the scatter has handed the mesh ring since the start (cumulative: a released cell's are not taken off)
 ## The profile's forest types. Frozen after _load_profile: scatter and placement workers read it.
 var _types: ForestTypesRes = ForestTypesRes.new()
 ## Some ring cell waits for its maps: _feed_maps has work.
@@ -1730,9 +1730,10 @@ func _ensure_maps(terrain: Node) -> void:
 		maps.region_exists = func(l: Vector2i) -> bool: return bool(data.call("has_region", l))
 	if maps.file_count() == 0 and not _maps_warned:
 		_maps_warned = true
-		ForestLog.warn(("[Vegetation] no forest maps in %s, so nothing grows. The forest import writes them "
-			+ "(res://addons/wuifwoud/tools/import_forest.gd)") % (dir if dir != "" else
-			"<maps_directory is empty and the terrain has no data_directory>"))
+		var where := dir if dir != "" else "<maps_directory is empty and the terrain has no data_directory>"
+		var grows := "only its single trees and rows grow" if not trees.items.is_empty() else "so nothing grows"
+		ForestLog.warn(("[Vegetation] no forest maps in %s: %s. The forest import writes them "
+			+ "(res://addons/wuifwoud/tools/import_forest.gd)") % [where, grows])
 	_stream_dirty = true   # cells admitted before the maps were known are fed; the unbounded mode re-lists
 
 
@@ -3511,6 +3512,8 @@ static func _rand01(s: int) -> float:
 ## this enables: RSS climbing while `pump_reload` climbs is pump churn; RSS
 ## climbing while `indirect.total_cpu_mb` climbs is the arenas refusing to give
 ## blocks back; RSS climbing with BOTH flat points somewhere else entirely.
+## Its items.planted counts every item tree planted since the forest started (a released or regrown cell's are not
+## taken off).
 func debug_churn() -> Dictionary:
 	var out := {
 		"bb_cells": _bb_cells.size(),

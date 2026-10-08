@@ -93,12 +93,19 @@ static func _report(d) -> Control:
 	var po: Array = rep.get("painted_overwritten", [])
 	if not po.is_empty():
 		v.add_child(d.amber("Painted texels overwritten in %d maps." % po.size()))
-	var km := PackedStringArray()
 	var km2: Dictionary = rep.get("km2", {})
-	for ty in km2:
-		km.append("%s %.3f km²" % [d.type_name(int(ty)), float(km2[ty])])
-	if not km.is_empty():
-		v.add_child(d.hint("By type: " + " · ".join(km)))
+	if not km2.is_empty():
+		var by := HFlowContainer.new()
+		by.name = "ByType"
+		by.add_theme_constant_override("h_separation", 12)
+		by.add_child(d.note("By type:"))
+		for ty in km2:
+			var cell := HBoxContainer.new()
+			cell.add_theme_constant_override("separation", 4)
+			cell.add_child(d.type_badge(int(ty)))
+			cell.add_child(d.note("%s %.3f km²" % [d.type_name(int(ty)), float(km2[ty])]))
+			by.add_child(cell)
+		v.add_child(by)
 	var um: Dictionary = rep.get("unmatched", {})
 	if not um.is_empty():
 		var ks := um.keys()

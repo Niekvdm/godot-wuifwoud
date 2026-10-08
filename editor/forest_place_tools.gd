@@ -6,8 +6,9 @@ extends RefCounted
 ## rows and edits their vertices. They work on the edited scene's forest's items (ForestTrees) through the paint
 ## provider, which routes its two Place tools' strokes, hover, panel and cursor note here. Every gesture is one undo
 ## step in that scene's history; an imported item a gesture changes becomes the author's (`edited`), one it deletes is
-## remembered (`removed`); nothing changes while an import runs, and a step from before an import is not undone. The
-## cells under an edit grow again every REGROW_EVERY_MS during a drag and at its end.
+## remembered (`removed`); nothing changes while an import runs, and a step from before an import is not undone. A
+## Revert asked while the source is read lands once it is, if its item is still the one selected. The cells under an
+## edit grow again every REGROW_EVERY_MS during a drag and at its end.
 
 ## The single trees and rows.
 const ForestTreesRes := preload("res://addons/wuifwoud/forest_trees.gd")
@@ -78,6 +79,7 @@ var _tool := TREE
 var _overlay = null                  # ForestPlaceOverlay
 var _drawn := []                     # what the overlay last drew: [revision, selected, hover, generation]
 var _seen: WeakRef = null            # the forest the selection, the hover, a gesture and the overlay belong to
+var _revert_wait := -1               # the item whose Revert waits for the source reader (-1: none)
 
 
 ## The paint provider these tools serve (held weakly: it holds them).
@@ -464,7 +466,7 @@ func _imported() -> Dictionary:
 		return {"why": "no mapping for this scene: Import… first"}
 	p.reader.request(m)
 	if not p.reader.poll():
-		return {"why": "reading the source…"}
+		return {"why": "reading the source…", "busy": true}
 	return {"items": p.reader.rules.get("items", {})}
 
 
@@ -480,7 +482,9 @@ func revert_selected() -> void:
 	var got := _imported()
 	if got.has("why"):
 		_note = String(got["why"])
+		_revert_wait = selected if bool(got.get("busy", false)) else -1
 		return
+	_revert_wait = -1
 	var src = (got["items"] as Dictionary).get(it["source"])
 	if src == null:
 		_note = "the source no longer has %s" % it["source"]
@@ -491,6 +495,18 @@ func revert_selected() -> void:
 	_commit(f, "Forest: Revert to import", f.trees.snapshot([selected]),
 		{"items": {selected: back}, "removed": (f.trees.removed as Array).duplicate(), "next_id": f.trees.next_id})
 	_note = ""
+
+
+## A Revert asked while the source was read: it lands once the reader is ready, if its item is still the one selected;
+## dropped when the selection moved on.
+func _land_waiting_revert() -> void:
+	if _revert_wait != selected:
+		_revert_wait = -1
+		return
+	var p := _pv()
+	if p != null and p.reader != null and p.reader.poll():
+		_revert_wait = -1    # asked once: a Revert the forest refuses now (an import started) is not asked again
+		revert_selected()
 
 
 ## Restore deleted imports (the panel's ⋯): every removed key the import still writes comes back with a new id;
@@ -711,6 +727,8 @@ func tick(on: bool) -> void:
 		if _overlay != null and is_instance_valid(_overlay):
 			_overlay.visible = false
 		return
+	if _revert_wait >= 0:
+		_land_waiting_revert()
 	if _overlay == null or not is_instance_valid(_overlay) or _overlay.get_parent() != f:
 		_overlay = OverlayRes.new()
 		f.add_child(_overlay, false, Node.INTERNAL_MODE_BACK)

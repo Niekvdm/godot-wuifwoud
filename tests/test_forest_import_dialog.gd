@@ -277,6 +277,9 @@ static func run() -> Dictionary:
 		[typed, dens_ok, val_ok, red_ok, (_saved()["rules"] as Array).size(), q.selected]),
 		typed and dens_ok and val_ok and red_ok and (_saved()["rules"] as Array).size() == 3 and q.selected == 2)
 	q.free()
+	var pd = b.dialog(_mapping(RULES3), {"profile": "flora.json"})
+	_chk(r, "a type the profile lacks names the profile's file (%s)" % pd.type_name(7), pd.type_name(7) == "type 7: not in flora.json")
+	pd.free()
 	# ── type icons: the rule rows and the inspector's type chips ──
 	var ic = b.dialog(_mapping(RULES3 + [{"match": {"kind": "scrub"}, "type": 7}]), {"types": TYPES_ICONS})
 	ic.select(0)
@@ -324,6 +327,9 @@ static func run() -> Dictionary:
 		not g.busy() and g.find_child("Report", true, false) != null and _has_text(g, "1 maps written")
 		and _has_text(g, "Forest 0.250 km²") and _has_text(g, "kind=pitch") and _has_text(g, "52 rows and 0 trees written")
 		and _has_text(g, "kind=fence 1.20 km") and g.error == "")
+	var bt: Node = g.find_child("ByType", true, false)
+	_chk(r, "the report's area by type wears each type's icon",
+		bt != null and bt.find_child("Icon", true, false) != null and _has_text(bt, "Forest 0.250 km²"))
 	(g.find_child("Overwrite", true, false).get_node("Toggle") as CheckBox).toggled.emit(true)
 	(g.find_child("Run", true, false) as Button).pressed.emit()
 	var asked_q: bool = g.find_child("Question", true, false) != null and b.ran.size() == 1
@@ -479,7 +485,7 @@ static func run() -> Dictionary:
 	var c6_names: Array = (c6["types"] as Array).map(func(t): return t.get("name", ""))
 	var c6_icons: Array = (c6["types"] as Array).map(func(t): return t.get("icon", ""))
 	_chk(r, "context_for: the types in the profile's order, each with its icon (%s; %s)" % [str(c6_names), str(c6_icons)],
-		c6_names == ["Scrub", "Wood"] and c6_icons == ["bush", "conifer"])
+		c6_names == ["Scrub", "Wood"] and c6_icons == ["bush", "conifer"] and c6.get("profile", "") == PROFILE_PATH.get_file())
 	vp.free()
 	ft.free()
 	ForestConfigRes.use(null)

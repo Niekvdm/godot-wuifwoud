@@ -273,12 +273,21 @@ static func run() -> Dictionary:
 	p.place.revert_selected()
 	var reading: String = p.cursor_note()
 	stub.ready = true
-	p.place.revert_selected()
+	p.activate("forest.row", null)
+	p.tick()
 	var rv: Dictionary = vp.trees.items[9]
-	_chk(r, "Revert to import: without a mapping, and while it is read, the note says so; then the import's row, not edited, its id kept, one step (%s; %s)" % [no_map, reading],
+	_chk(r, "Revert to import: without a mapping, and while it is read, the note says so; once read it lands by itself (no second click): the import's row, not edited, its id kept, one step (%s; %s)" % [no_map, reading],
 		no_map == "no mapping for this scene: Import… first" and reading == "reading the source…"
 		and rv["points"] == PackedVector2Array([Vector2(100, 150), Vector2(140, 150)]) and not bool(rv["edited"])
 		and undo.actions[-1]["name"] == "Forest: Revert to import")
+	var acts_before: int = undo.actions.size()
+	stub.ready = false
+	p.place.selected = 9
+	p.place.revert_selected()
+	p.place.selected = -1
+	stub.ready = true
+	p.tick()
+	_chk(r, "a waiting Revert lands nowhere once the selection moved on", undo.actions.size() == acts_before)
 	vp.trees.apply(vp.trees.deletion(9))
 	var add_rm: Dictionary = vp.trees.snapshot([])
 	add_rm["removed"] = ["osm_id:77", "osm_id:78", "osm_id:99"]

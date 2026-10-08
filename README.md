@@ -50,7 +50,7 @@ A `ForestConfig` resource at `res://wuifwoud_config.tres` (or at the path in the
 | Field | Meaning |
 |---|---|
 | `runtime_inputs` | Feeder scripts (`ForestFeeder`) added under every forest node in the game |
-| `editor_inputs` | Feeders that also run in the editor (`@tool` scripts) |
+| `editor_inputs` | Feeders run in the editor in place of `runtime_inputs` (`@tool` scripts) |
 | `packs` | The species packs this project lists |
 | `disabled_packs` | Packs not to grow, by `res://` path: a listed pack, a pack addon, one of its packs, or the starter |
 | `default_profile_path` | The fallback flora: its `species` and `dead` pools fill what a profile lacks (empty: the starter's flora) |

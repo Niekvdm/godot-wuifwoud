@@ -173,9 +173,12 @@ static func run() -> Dictionary:
 		var done := _wait(job)
 		var pr: Dictionary = job.progress()
 		runs.append([done, bool(job.report.get("ok", false)), _bytes() == first, seen.size(), pr["phase"],
-			pr["done"] == pr["total"], job.is_running()])
+			pr["done"] == pr["total"] and int(pr["total"]) > 0, job.is_running()])
 	_chk(r, "on a worker, twice: polled to the end, the same bytes as run_now, finished once, progress at its total (%s)" % str(runs),
 		runs.all(func(x): return x == [true, true, true, 1, "done", true, false]))
+	var ej = JobRes.new(_mapping(), {"meta": META, "edits": {Vector2i(9, 9): Image.create_empty(RS, RS, false, Image.FORMAT_RGBA8)}})
+	ej.run_now()
+	_chk(r, "a finished run lets go of the editor's copies (%d)" % ej.edits.size(), ej.edits.is_empty() and ej.trees_edit == null)
 
 	# ── final review: the job finishes with every other low-priority slot of the pool busy ──
 	var held := _hold_slots()
