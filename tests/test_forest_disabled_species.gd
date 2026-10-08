@@ -4,7 +4,8 @@ extends RefCounted
 ## Switching species and packs off: the config lists every pack, the switched-off ones marked, and resolved_sources keeps
 ## the rest as before; a disabled species is in no species table and is named disabled; drop_species takes it out of
 ## every pool, the rest in order with their weights, and returns the pools themselves when nothing is disabled; a
-## profile loads without it (each type's pools too); a single tree pinned to it grows its type's pick.
+## profile loads without it (each type's pools too); a single tree pinned to it grows its type's pick; a type's own
+## mix loses it too, and species_names() knows a species only an own mix names.
 ##
 ## Run with a unit-suite runner: static run() returns {name, passed, failed, details}.
 
@@ -91,6 +92,18 @@ static func run() -> Dictionary:
 		"edited": false})
 	var items: Array = vs._items_for(Rect2(0, 0, 50, 50))
 	_chk(r, "a single tree pinned to it grows its type's pick", items.size() == 1 and String(items[0]["species"]) == "")
+	# ── a type's own mix loses it too; species_names() knows the own mixes ──
+	var with_own: Dictionary = PROFILE.duplicate(true)
+	(with_own["types"] as Array).append({"id": 2, "name": "Grove", "style": "bushes", "density_per_m2": 0.01,
+		"mixes": {"bush": [["W_B", 1.0], ["W_C", 2.0], ["W_D", 1.0]]}})
+	var f2 := FileAccess.open(ROOT + "/profile_own.json", FileAccess.WRITE)
+	f2.store_string(JSON.stringify(with_own))
+	f2.close()
+	vs.profile_path = ROOT + "/profile_own.json"
+	vs._load_profile()
+	_chk(r, "a type's own mix loses the switched-off species, the rest keep their weights (%s)" % str(vs._types.get_type(2).get("bush")),
+		vs._types.get_type(2).get("bush") == [["W_C", 2.0], ["W_D", 1.0]])
+	_chk(r, "species_names() knows a species only an own mix names", Array(vs.species_names()).has("W_D"))
 	vs.free()
 	VA.forget_packs()
 	VA.reset()

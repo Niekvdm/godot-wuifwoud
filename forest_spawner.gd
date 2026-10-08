@@ -1035,8 +1035,9 @@ func _load_profile() -> void:
 	_name_species()
 
 
-## Every species the pools can place, looked up once here on the MAIN thread: placement workers ask about species
-## too, and a species no pack has is named in a warning on its first lookup, which must not be a worker's.
+## Every species the pools can place, the types' own mixes included, looked up once here on the MAIN thread:
+## placement workers ask about species too, and a species no pack has is named in a warning on its first lookup, which
+## must not be a worker's.
 func _name_species() -> void:
 	for pools in [_species, _dead]:
 		for band in pools:
@@ -1045,6 +1046,10 @@ func _name_species() -> void:
 				continue
 			for e in pool:
 				ForestAssets._species_entry(str(e[0]) if typeof(e) == TYPE_ARRAY else str(e))
+	for id in _types.ids():
+		for pool in _type_pools(_types.get_type(id)).values():
+			for e in pool:
+				ForestAssets._species_entry(_entry_name(e))
 
 
 func _load_profile_pools() -> void:
@@ -1091,7 +1096,7 @@ func _load_profile_pools() -> void:
 	if data.has("types"):
 		_types.load_list(data["types"], _species, _dead,
 			func(n: String) -> bool: return ForestAssets.is_young(n),
-			func(n: String) -> bool: return ForestAssets.is_mature(n))
+			func(n: String) -> bool: return ForestAssets.is_mature(n), ForestAssets.disabled_ids())
 		for e in _types.errors:
 			ForestLog.error("[Wuifwoud] %s: %s" % [profile_path.get_file(), e])
 	else:
@@ -1802,7 +1807,7 @@ func _items_for(rect: Rect2) -> Array:
 	return out
 
 
-## Every species the profile's pools name, sorted (the Place tools' species picker).
+## Every species the profile's pools and its types' own mixes name, sorted (the Place tools' species picker).
 func species_names() -> PackedStringArray:
 	var seen := {}
 	for band in _species:
@@ -1811,6 +1816,10 @@ func species_names() -> PackedStringArray:
 			continue
 		for e in pool:
 			seen[str(e[0]) if typeof(e) == TYPE_ARRAY else str(e)] = true
+	for id in _types.ids():
+		for pool in _type_pools(_types.get_type(id)).values():
+			for e in pool:
+				seen[_entry_name(e)] = true
 	var out := PackedStringArray(seen.keys())
 	out.sort()
 	return out

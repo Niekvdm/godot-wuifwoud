@@ -3,7 +3,8 @@
 extends RefCounted
 ## ForestTypes: a profile's `types`: the four styles with their defaults, stable ids whatever
 ## the list order, pools resolved by name (the defaults follow today's pool names), the age subsets, and every error
-## named while the good types still load.
+## named while the good types still load; a type's own mixes (they win over pools; the dead rows too; switched-off
+## species leave them), its icon and colour, and the profile's order.
 ##
 ## Run with a unit-suite runner: static run() returns {name, passed, failed, details}.
 
@@ -81,6 +82,43 @@ static func run() -> Dictionary:
 		Array(bad.ids()) == [1, 11] and bad.errors.size() == 9)
 	var none = _parse("nope")
 	_chk(r, "types that are not a list: one error, no types", none.by_id.is_empty() and none.errors.size() == 1)
+	# ── a type's own mixes ──
+	var own = _parse([{"id": 5, "name": "Own", "style": "natural", "density_per_m2": 0.02,
+			"pools": {"mid": "high"}, "bush_pool": "orchard",
+			"mixes": {"coast": [["Young", 4.0]], "mid": [["Old", 1.0], ["Young", 2.0]], "bush": [["Fern", 2.0]],
+				"dead": {"high": ["Snag_C"]}}},
+		{"id": 6, "name": "Own grid", "style": "grid", "mixes": {"grid": [["Old", 1.0]]}},
+		{"id": 8, "name": "Own mix", "style": "mix", "density_per_m2": 0.01, "mixes": {"trees": [["Young", 1.0]]}}])
+	var o: Dictionary = own.get_type(5)
+	_chk(r, "an own mix wins over the pool its old key names; a lane without one keeps its pool (%s)" % str(own.errors),
+		own.errors.is_empty() and o["bands"]["coast"] == [["Young", 4.0]]
+		and o["bands"]["mid"] == [["Old", 1.0], ["Young", 2.0]] and o["bands"]["high"] == SPECIES["high"]
+		and o["bush"] == [["Fern", 2.0]])
+	_chk(r, "the age subsets come from the own mix; a dead row: its own, else the pool",
+		o["young"]["mid"] == [["Young", 2.0]] and o["mature"]["mid"] == [["Old", 1.0]] and o["dead"]["high"] == ["Snag_C"]
+		and o["dead"]["coast"] == ["Snag_A"])
+	_chk(r, "a grid's own grid lane, a mix's own trees lane", own.get_type(6)["pool"] == [["Old", 1.0]]
+		and own.get_type(8)["tree"] == [["Young", 1.0]] and own.get_type(8)["tree_young"] == [["Young", 1.0]])
+	var off = TypesRes.new()
+	off.load_list([{"id": 5, "name": "Own", "style": "natural", "density_per_m2": 0.02,
+		"mixes": {"mid": [["Old", 1.0], ["Young", 2.0]], "dead": {"mid": ["Snag_B", "Snag_C"]}}}], SPECIES, DEAD,
+		func(_n: String) -> bool: return false, func(_n: String) -> bool: return false,
+		PackedStringArray(["Young", "Snag_B"]))
+	_chk(r, "a switched-off species leaves an own mix too, the rest keep their weights (%s)" % str(off.get_type(5).get("bands")),
+		off.get_type(5)["bands"]["mid"] == [["Old", 1.0]] and off.get_type(5)["dead"]["mid"] == ["Snag_C"])
+	var badm = _parse([{"id": 5, "name": "A", "style": "bushes", "density_per_m2": 0.01, "mixes": "nope"},
+		{"id": 6, "name": "B", "style": "bushes", "density_per_m2": 0.01, "mixes": {"bush": "nope"}},
+		{"id": 7, "name": "C", "style": "natural", "density_per_m2": 0.01, "mixes": {"dead": []}}])
+	_chk(r, "mixes not an object, an own lane not a list, dead rows not an object: each named and dropped (%s)" % str(badm.errors),
+		badm.by_id.is_empty() and badm.errors.size() == 3)
+	# ── icon, colour, the profile's order ──
+	var dressed = _parse([
+		{"id": 9, "name": "Ridge", "style": "bushes", "density_per_m2": 0.01, "icon": "conifer", "colour": "#3f7d4c"},
+		{"id": 2, "name": "Scrub", "style": "bushes", "density_per_m2": 0.01, "colour": "green"}])
+	_chk(r, "icon and colour read; a colour that is not #rrggbb named and ignored (%s)" % str(dressed.errors),
+		dressed.get_type(9)["icon"] == "conifer" and dressed.get_type(9)["colour"] == Color.html("#3f7d4c")
+		and not dressed.get_type(2).has("colour") and dressed.errors.size() == 1 and dressed.by_id.size() == 2)
+	_chk(r, "order(): the profile's order; ids() sorted", Array(dressed.order()) == [9, 2] and Array(dressed.ids()) == [2, 9])
 	return r
 
 

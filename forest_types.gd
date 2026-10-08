@@ -7,10 +7,12 @@ extends RefCounted
 ## forest, bushes only, a planted grid, a light mix of trees and bushes) with its own density, pools and
 ## stand numbers, under a stable numeric id (1-255) that the maps store, so reordering the list changes nothing.
 ##
-## Pools are named: a type takes the profile's (and the fallback flora's) `species` / `dead` pools by name, and the
-## defaults are the names a profile already uses. The age subsets (young, mature) are built here, once, on the main
-## thread, so placement workers never ask the species packs. A bad type is named in `errors` and dropped; the rest
-## load. Immutable after load_list: workers read it.
+## A type's lanes: its own mix when its `mixes` names one (`coast`, `mid`, `high`, `bush`; a grid's `grid`; a mix's
+## `trees`; `dead` by band), else a pool taken by name from the profile's (and the fallback flora's) `species` / `dead`,
+## the old keys (`pools`, `bush_pool`, `pool`, `tree_pool`, `dead`) naming it or the lane's default name. A type may
+## carry an `icon` (a glyph name) and a `colour` (#rrggbb) for the editor. The age subsets (young, mature) are built
+## here, once, on the main thread, so placement workers never ask the species packs. A bad type is named in `errors`
+## and dropped; the rest load. Immutable after load_list: workers read it.
 
 ## A type's styles.
 const STYLES := ["natural", "bushes", "grid", "mix"]
@@ -31,22 +33,29 @@ var by_id := {}
 var errors: PackedStringArray = []
 
 
-## The types of `list` (a profile's `types`), their pools taken by name from `species` / `dead`. `is_young` and
+## The types of `list` (a profile's `types`): each lane its own mix, else the pool its name takes from `species` /
+## `dead`. The species `disabled` names leave the own mixes (the pools come without them already). `is_young` and
 ## `is_mature` (species name -> bool) build the age subsets.
-func load_list(list, species: Dictionary, dead: Dictionary, is_young: Callable, is_mature: Callable) -> void:
+func load_list(list, species: Dictionary, dead: Dictionary, is_young: Callable, is_mature: Callable,
+		disabled := PackedStringArray()) -> void:
 	by_id.clear()
 	errors.clear()
 	if typeof(list) != TYPE_ARRAY:
 		errors.append("types must be a list")
 		return
 	for e in list:
-		var t := _one(e, species, dead, is_young, is_mature)
+		var t := _one(e, species, dead, is_young, is_mature, disabled)
 		if t.is_empty():
 			continue
 		if by_id.has(t["id"]):
 			errors.append("type id %d is used twice: '%s' is dropped" % [t["id"], t["name"]])
 			continue
 		by_id[t["id"]] = t
+
+
+## The type ids in the profile's order (the workspace library's).
+func order() -> PackedInt32Array:
+	return PackedInt32Array(by_id.keys())
 
 
 ## The type ids, sorted.
@@ -61,7 +70,8 @@ func get_type(id: int) -> Dictionary:
 	return by_id.get(id, {})
 
 
-func _one(e, species: Dictionary, dead: Dictionary, is_young: Callable, is_mature: Callable) -> Dictionary:
+func _one(e, species: Dictionary, dead: Dictionary, is_young: Callable, is_mature: Callable,
+		disabled: PackedStringArray) -> Dictionary:
 	if typeof(e) != TYPE_DICTIONARY:
 		errors.append("a type is not an object: %s" % str(e))
 		return {}
@@ -105,7 +115,26 @@ func _one(e, species: Dictionary, dead: Dictionary, is_young: Callable, is_matur
 			t["far_color"] = Color.html(String(fc))
 		else:
 			errors.append("%s: far_color must be \"#rrggbb\" (%s): ignored" % [label, str(fc)])
-	var bush = _pool(species, str(d.get("bush_pool", "bush")), label)
+	var ic = d.get("icon")
+	if ic != null:
+		t["icon"] = str(ic)
+	var co = d.get("colour")
+	if co != null:
+		if typeof(co) == TYPE_STRING and String(co).begins_with("#") and Color.html_is_valid(String(co)):
+			t["colour"] = Color.html(String(co))
+		else:
+			errors.append("%s: colour must be \"#rrggbb\" (%s): ignored" % [label, str(co)])
+	var mixes = d.get("mixes", {})
+	if typeof(mixes) != TYPE_DICTIONARY:
+		errors.append("%s: mixes must be an object" % label)
+		return {}
+	var dead_mix = (mixes as Dictionary).get("dead", {})
+	if typeof(dead_mix) != TYPE_DICTIONARY:
+		errors.append("%s: mixes.dead must be an object of dead-tree lists by band" % label)
+		return {}
+	mixes = drop_species(mixes, disabled)
+	dead_mix = drop_species(dead_mix, disabled)
+	var bush = _lane(mixes, "bush", species, str(d.get("bush_pool", "bush")), label)
 	if bush == null:
 		return {}
 	t["bush"] = bush
@@ -116,7 +145,7 @@ func _one(e, species: Dictionary, dead: Dictionary, is_young: Callable, is_matur
 			var young := {}
 			var mature := {}
 			for b in BANDS:
-				var p = _pool(species, str(names.get(b, b)), label)
+				var p = _lane(mixes, b, species, str(names.get(b, b)), label)
 				if p == null:
 					return {}
 				bands[b] = p
@@ -128,16 +157,16 @@ func _one(e, species: Dictionary, dead: Dictionary, is_young: Callable, is_matur
 			var dnames: Dictionary = d["dead"] if typeof(d.get("dead")) == TYPE_DICTIONARY else {}
 			var dd := {}
 			for b in BANDS:
-				var dp = dead.get(str(dnames.get(b, b)), [])
+				var dp = dead_mix[b] if (dead_mix as Dictionary).has(b) else dead.get(str(dnames.get(b, b)), [])
 				dd[b] = dp if typeof(dp) == TYPE_ARRAY else []
 			t["dead"] = dd
 		"grid":
-			var gp = _pool(species, str(d.get("pool", "orchard")), label)
+			var gp = _lane(mixes, "grid", species, str(d.get("pool", "orchard")), label)
 			if gp == null:
 				return {}
 			t["pool"] = gp
 		"mix":
-			var tp = _pool(species, str(d.get("tree_pool", "mid")), label)
+			var tp = _lane(mixes, "trees", species, str(d.get("tree_pool", "mid")), label)
 			if tp == null:
 				return {}
 			t["tree"] = tp
@@ -145,6 +174,16 @@ func _one(e, species: Dictionary, dead: Dictionary, is_young: Callable, is_matur
 			t["tree_mature"] = (tp as Array).filter(func(x): return bool(is_mature.call(str(x[0]))))
 			t["tree_share"] = clampf(float(d.get("tree_share", DEFAULT_TREE_SHARE)), 0.0, 1.0)
 	return t
+
+
+## A type's lane `key`: its own mix (`mixes[key]`, a list), else the pool `name`; null with an error when neither is.
+func _lane(mixes: Dictionary, key: String, species: Dictionary, name: String, label: String):
+	if mixes.has(key):
+		if typeof(mixes[key]) != TYPE_ARRAY:
+			errors.append("%s: its own %s mix must be a list" % [label, key])
+			return null
+		return mixes[key]
+	return _pool(species, name, label)
 
 
 ## A named pool, or null with an error when neither the profile nor the fallback flora has it. A pool authored as []
