@@ -229,6 +229,25 @@ static func hemi_oct_dir(u: float, v: float) -> Vector3:
 	return Vector3(px, py, pz).normalized()
 
 
+## The grid position (u, v in [0, 1]) of the view looking FROM direction `dir` (a direction under the horizon taken at
+## the horizon): the inverse of hemi_oct_dir.
+static func hemi_oct_uv(dir: Vector3) -> Vector2:
+	var d := Vector3(dir.x, maxf(dir.y, 0.0), dir.z)
+	var s := absf(d.x) + absf(d.y) + absf(d.z)
+	if s < 1e-9:
+		return Vector2(0.5, 0.5)
+	var px := d.x / s
+	var pz := d.z / s
+	return Vector2((px + pz + 1.0) * 0.5, (pz + 1.0 - px) * 0.5)
+
+
+## The view (column, row) of the GRID × GRID sheet nearest direction `dir`.
+static func view_cell(dir: Vector3) -> Vector2i:
+	var uv := hemi_oct_uv(dir)
+	var n1 := float(GRID - 1)
+	return Vector2i(clampi(roundi(uv.x * n1), 0, GRID - 1), clampi(roundi(uv.y * n1), 0, GRID - 1))
+
+
 func _aim_round() -> void:
 	var h: float = float(_meta["h"])
 	var span: float = float(_meta["span"])

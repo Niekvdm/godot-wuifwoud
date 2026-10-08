@@ -1180,35 +1180,29 @@ static func _crown_uv_of(mesh: ArrayMesh, foliage: PackedInt32Array) -> Vector4:
 	return Vector4(lo.x, lo.y, hi.x, hi.y)
 
 
-## Impostor card + material for a species: a QuadMesh sized to the tree's real
-## height (base at the pivot) and a billboard ShaderMaterial carrying the
-## foliage/trunk colours + silhouette profile. Cached; shares the wind feed.
-static func _billboard(mesh_name: String) -> Dictionary:
-	if _billboard_cache.has(mesh_name):
-		return _billboard_cache[mesh_name]
-	var p := _prepared(mesh_name)
-	if p.is_empty():
-		_billboard_cache[mesh_name] = {}
-		return {}
+## An impostor card for species `id` (`sp` its ForestSpecies or null, `p` its preparation, `ring` its baked view ring or
+## {}, `profile` its silhouette family): {"mesh": QuadMesh, "mat": ShaderMaterial}. Neither cached nor registered for
+## the wind and the hand-over pushes: _billboard does both for the forest's own cards; the Species dialog's view draws
+## one of its own.
+static func card_of(id: String, sp, p: Dictionary, ring: Dictionary, profile: int) -> Dictionary:
 	var height: float = maxf((p["aabb"] as AABB).size.y, 1.0)
 	# COLOURS COME FROM THE ATLAS, NOT THE MATERIAL. A classification by the "greenness"
 	# of `albedo_color` only works while meshes carry authored material colours. Stylised
 	# packs often import UNTEXTURED with white materials, so every surface scores the same
 	# and every impostor comes out WHITE: a hillside of white lollipops past
 	# tree_visibility_m that turn green the moment they cross into mesh range.
-	var crown := _crown_uv_rect(mesh_name)
-	var atlas := _atlas_for(mesh_name, true)
+	var crown: Vector4 = p.get("crown_uv", Vector4(0.0, 0.0, 1.0, 1.0))
+	var atlas := _atlas_of(sp, true)
 	var q := QuadMesh.new()
 	var sm := ShaderMaterial.new()
 	sm.shader = _billboard_shader_res()
-	sm.resource_name = mesh_name
+	sm.resource_name = id
 
 	# BAKED VIEW RING, when the species' pack is built (its built/ holds the impostor sheets).
 	# The card must span the SAME world square the bake framed, or the tree renders
 	# scaled and off its own trunk; so the span comes out of the bake's manifest
 	# rather than being re-derived here from the AABB. Two derivations of one number
 	# is how an impostor ends up beside the mesh it replaces.
-	var ring := _impostor_ring(mesh_name)
 	if not ring.is_empty():
 		var span: float = float(ring["span"])
 		q.size = Vector2(span, span)
@@ -1248,10 +1242,63 @@ static func _billboard(mesh_name: String) -> Dictionary:
 	# and the mesh trees and their cards are the same hillside either side of the
 	# hand-over.
 	sm.set_shader_parameter("backlight_col", Color(0.10, 0.14, 0.05))
-	sm.set_shader_parameter("profile", _profile_of(mesh_name))
-	_live_materials.append(sm)
-	_billboard_cache[mesh_name] = {"mesh": q, "mat": sm}
-	return _billboard_cache[mesh_name]
+	sm.set_shader_parameter("profile", profile)
+	return {"mesh": q, "mat": sm}
+
+
+## Impostor card + material for a species: a QuadMesh sized to the tree's real
+## height (base at the pivot) and a billboard ShaderMaterial carrying the
+## foliage/trunk colours + silhouette profile. Cached; shares the wind feed.
+static func _billboard(mesh_name: String) -> Dictionary:
+	if _billboard_cache.has(mesh_name):
+		return _billboard_cache[mesh_name]
+	var p := _prepared(mesh_name)
+	if p.is_empty():
+		_billboard_cache[mesh_name] = {}
+		return {}
+	_ensure_packs()
+	var out := card_of(mesh_name, _species.get(mesh_name), p, _impostor_ring(mesh_name), _profile_of(mesh_name))
+	_live_materials.append(out["mat"])
+	_billboard_cache[mesh_name] = out
+	return out
+
+
+## What the Species dialog's view draws of species `sp` (its pack built in `dir`, whose built.json is `man`): its
+## preparation (the built one when built.json lists it at this PREP_VERSION and its file loads, else prepared now:
+## MAIN THREAD), its combined mesh and each authored level dressed with the species' own materials, its baked ring (the
+## last bake's, current or not) and its card (none for a bush). {} when it has no mesh. Nothing is cached or
+## registered: the dialog's edits must show, and the forest's caches must not hold them.
+static func view_parts(sp, dir: String, man: Dictionary) -> Dictionary:
+	if sp == null:
+		return {}
+	var id := String(sp.id)
+	var p := {}
+	var e: Dictionary = (man.get("species", {}) as Dictionary).get(id, {})
+	var path := dir.path_join(id + ".res") if dir != "" else ""
+	if not e.is_empty() and int(e.get("prep_version", -1)) == PREP_VERSION and path != "" and ResourceLoader.exists(path):
+		var b = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_REPLACE)
+		if b != null and b.has_method("to_prepared"):
+			p = b.to_prepared()
+	var built := not p.is_empty()
+	if not built:
+		p = prepare_species_of(sp)
+	if not p.has("combined"):
+		return {}
+	var combined := (p["combined"] as ArrayMesh).duplicate() as ArrayMesh
+	_dress(sp, combined, p, false)
+	var levels := []
+	for m in p.get("levels", []):
+		var lm := (m as ArrayMesh).duplicate() as ArrayMesh
+		for si in lm.get_surface_count():
+			lm.surface_set_material(si, combined.surface_get_material(si))
+		levels.append(lm)
+	if levels.is_empty():
+		levels = [combined]
+	var ring := ring_at(dir, id, man)
+	var card := {} if String(sp.kind) == "bush" else card_of(id, sp, p, ring, crown_profile(String(sp.crown)))
+	return {"prepared": p, "built": built, "combined": combined, "levels": levels, "ring": ring, "card": card,
+		"warnings": p.get("warnings", PackedStringArray())}
+
 
 ## A pack's built.json, read once: {"bake": {grid, cols, rows, …}, "species": {id: {span, w, h, …}}};
 ## {} for a pack that is not built (or not a file).
@@ -1294,6 +1341,31 @@ static func built_crown_colour(mesh_name: String) -> Array:
 	return [null]
 
 
+## The baked view ring of species `id` in built folder `dir` (`man` its built.json), or {} when that folder holds none:
+## the sheets as textures (loaded REPLACING a cached copy) and the bake's framing. Uncached: _impostor_ring caches it
+## per species for the forest; the Species dialog's view reads a fresh build.
+static func ring_at(dir: String, id: String, man: Dictionary) -> Dictionary:
+	var bake: Dictionary = man.get("bake", {})
+	var e: Dictionary = (man.get("species", {}) as Dictionary).get(id, {})
+	var a := dir.path_join(id + "_albedo.res")
+	var n := dir.path_join(id + "_normal.res")
+	if dir == "" or not e.has("span") or int(bake.get("grid", 0)) <= 0 \
+			or not ResourceLoader.exists(a) or not ResourceLoader.exists(n):
+		return {}
+	return {
+		"albedo": _sheet(a),
+		"normal": _sheet(n),
+		"grid": int(bake["grid"]),
+		"cols": int(bake.get("cols", bake["grid"])),
+		"rows": int(bake.get("rows", bake["grid"])),
+		# The card spans the SAME world square the bake framed (`span`), the tree's own extent inside it (`w`, `h`):
+		# the card shader places its crown dome on the tree, not on the card.
+		"span": float(e["span"]),
+		"w": float(e.get("w", 0.0)),
+		"h": float(e.get("h", 0.0)),
+	}
+
+
 ## The baked view ring of a species (its pack's build bakes it), or {} if it has none: the procedural
 ## silhouette is the fallback, a downgrade rather than a black card. The G-buffer pair: premultiplied albedo with the
 ## crown occlusion baked in, the normal the mesh is lit with and its transmission weight. Loaded REPLACING a cached copy:
@@ -1303,26 +1375,8 @@ static func _impostor_ring(mesh_name: String) -> Dictionary:
 		return {}
 	if _ring_cache.has(mesh_name):
 		return _ring_cache[mesh_name]
-	var out := {}
 	var dir := built_dir_of(mesh_name)
-	var bake: Dictionary = _manifest(dir).get("bake", {})
-	var e := built_entry(mesh_name)
-	var a := dir.path_join(mesh_name + "_albedo.res")
-	var n := dir.path_join(mesh_name + "_normal.res")
-	if dir != "" and e.has("span") and int(bake.get("grid", 0)) > 0 \
-			and ResourceLoader.exists(a) and ResourceLoader.exists(n):
-		out = {
-			"albedo": _sheet(a),
-			"normal": _sheet(n),
-			"grid": int(bake["grid"]),
-			"cols": int(bake.get("cols", bake["grid"])),
-			"rows": int(bake.get("rows", bake["grid"])),
-			# The card spans the SAME world square the bake framed (`span`), the tree's own extent inside it (`w`, `h`):
-			# the card shader places its crown dome on the tree, not on the card.
-			"span": float(e["span"]),
-			"w": float(e.get("w", 0.0)),
-			"h": float(e.get("h", 0.0)),
-		}
+	var out := ring_at(dir, mesh_name, _manifest(dir))
 	_ring_cache[mesh_name] = out
 	return out
 
@@ -1334,12 +1388,17 @@ static func _sheet(path: String) -> Texture2D:
 	return ImageTexture.create_from_image(res) if res is Image else res as Texture2D
 
 
-## The procedural card silhouette's family: 0 broadleaf, 1 conifer, 2 palm (the catalog's `crown`).
-static func _profile_of(mesh_name: String) -> int:
-	var sp = _species_entry(mesh_name)
-	match String(sp.crown) if sp != null else "broadleaf":
+## The procedural card silhouette's family of crown `crown`: 0 broadleaf, 1 conifer, 2 palm.
+static func crown_profile(crown: String) -> int:
+	match crown:
 		"conifer":
 			return 1
 		"palm":
 			return 2
 	return 0
+
+
+## The procedural card silhouette's family of species `mesh_name`: 0 broadleaf, 1 conifer, 2 palm (its `crown`).
+static func _profile_of(mesh_name: String) -> int:
+	var sp = _species_entry(mesh_name)
+	return crown_profile(String(sp.crown) if sp != null else "broadleaf")
