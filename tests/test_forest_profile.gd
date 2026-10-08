@@ -176,6 +176,6 @@ static func run() -> Dictionary:
 	_chk(r, "a profile with no file yet is not written, and says so (%s)" % pn.problem,
 		en != OK and String(pn.problem).contains("no file"))
 	_chk(r, "the addon's folder, public (%s)" % ForestConfig.addon_dir(),
-		ForestConfig.addon_dir() == "res://addons/wuifwoud" and ProfileRes.is_read_only(STARTER_FLORA))
+		ForestConfig.addon_dir() + "/" == "res://addons/wuifwoud/" and ProfileRes.is_read_only(STARTER_FLORA))
 	TreeFix.rm_tree(ROOT)
 	return r
