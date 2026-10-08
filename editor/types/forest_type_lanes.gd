@@ -131,8 +131,7 @@ static func _row(d, lane: String) -> Control:
 		func(kind: String, id: String) -> void: d.drop_on_lane(lane, kind, id),
 		d.box(FILL, d.accent if focus else Color(0, 0, 0, 0)), d.box(Color(d.accent, 0.1), d.accent))
 	target.name = "Drop_" + lane.replace(".", "_")      # a node name takes no "."
-	# Deferred: a click on a tile reaches its row too, and the tile must still be there for its own `pressed`.
-	target.pressed.connect(d.focus_lane.bind(lane), CONNECT_DEFERRED)
+	target.pressed.connect(d.focus_lane.bind(lane))
 	var v := VBoxContainer.new()
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_theme_constant_override("separation", 3)

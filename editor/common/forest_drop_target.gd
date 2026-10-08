@@ -4,8 +4,9 @@
 extends PanelContainer
 ## Where a dragged value, a rule's handle, a type's handle or a species can be dropped in Wuifwoud's dialogs: it
 ## takes the drag kinds in `kinds` and calls `on_drop(kind, id)`, wearing its hover style while one it takes is over
-## it. A click emits `pressed` (a rule row selects its rule), a right click `menu_requested`. Its children must be
-## MOUSE_FILTER_IGNORE or PASS: Godot stops looking for a drop target at a STOP control.
+## it. A click emits `pressed` when the button is let go (a rule row selects its rule), a right click
+## `menu_requested`. Its children must be MOUSE_FILTER_IGNORE or PASS: Godot stops looking for a drop target at a STOP
+## control.
 
 ## Clicked (a rule row selects its rule).
 signal pressed
@@ -50,12 +51,15 @@ func _notification(what: int) -> void:
 
 func _gui_input(ev: InputEvent) -> void:
 	var mb := ev as InputEventMouseButton
-	if mb == null or not mb.pressed:
+	if mb == null:
 		return
-	if mb.button_index == MOUSE_BUTTON_LEFT:
+	if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
+		# On the release, not the press: a press on a tile or a handle inside reaches this too (a Button does not take
+		# it), and a dialog rebuilt then would take that tile away before its own release (its click) or its drag.
+		# A tile whose click rebuilds the dialog leaves the tree first, so its release never gets here.
 		pressed.emit()
 		accept_event()
-	elif mb.button_index == MOUSE_BUTTON_RIGHT:
+	elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
 		menu_requested.emit(get_global_mouse_position())
 		accept_event()
 
