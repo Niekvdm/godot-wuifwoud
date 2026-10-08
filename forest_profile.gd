@@ -459,3 +459,271 @@ func resolve(is_young := Callable(), is_mature := Callable(), disabled := Packed
 ## What the forest refuses in the profile as it is (ForestTypes' errors).
 func load_errors() -> PackedStringArray:
 	return resolve().errors
+
+
+# --- the edits: each changes the document and returns "" (done) or why not (nothing changed then) ---
+
+## + New type: the next free id, "New type", natural, NEW_DENSITY, every lane inherited. Its id; 0 when every id is
+## taken (nothing added).
+func add_type() -> int:
+	var id := next_id()
+	if id == 0:
+		return 0
+	_list().append({"id": id, "name": "New type", "style": "natural", "density_per_m2": NEW_DENSITY})
+	return id
+
+
+## Type `id` duplicated right after it: a new id, "<name> copy", its settings and its own lanes copied. The new id; 0
+## when there is no type `id` or no free id.
+func duplicate_type(id: int) -> int:
+	var t := type_of(id)
+	var nid := next_id()
+	if t.is_empty() or nid == 0:
+		return 0
+	var c: Dictionary = t.duplicate(true)
+	c["id"] = nid
+	c["name"] = "%s copy" % str(t.get("name", "type %d" % id))
+	_list().insert(index_of(id) + 1, c)
+	return nid
+
+
+## Type `id` deleted.
+func delete_type(id: int) -> String:
+	var i := index_of(id)
+	if i < 0:
+		return "there is no type %d" % id
+	_list().remove_at(i)
+	return ""
+
+
+## Type `id` moved to position `to` of the list (the library's order; ids never change).
+func move_type(id: int, to: int) -> String:
+	var i := index_of(id)
+	if i < 0:
+		return "there is no type %d" % id
+	var l := _list()
+	var t = l[i]
+	l.remove_at(i)
+	l.insert(clampi(to, 0, l.size()), t)
+	return ""
+
+
+## Type `id`'s setting `key` set to `value`, within the range the forest takes: a name is not empty; a density and a
+## pitch are above 0; clump, dead share and tree share 0-1, understory 0-2, the edge wall 0 or more, its multiplier 1
+## or more; an icon a name ("" takes it out); a colour or a far colour "#rrggbb" ("" takes it out).
+func set_value(id: int, key: String, value) -> String:
+	var t := type_of(id)
+	if t.is_empty():
+		return "there is no type %d" % id
+	match key:
+		"name":
+			var nm := str(value).strip_edges()
+			if nm == "":
+				return "a type needs a name"
+			t["name"] = nm
+		"density_per_m2", "pitch_m":
+			if float(value) <= 0.0:
+				return "%s must be above 0" % ("the density" if key == "density_per_m2" else "the pitch")
+			t[key] = float(value)
+		"clump", "dead_frac", "tree_share":
+			t[key] = clampf(float(value), 0.0, 1.0)
+		"understory":
+			t[key] = clampf(float(value), 0.0, 2.0)
+		"edge_wall_m":
+			t[key] = maxf(float(value), 0.0)
+		"edge_wall_mult":
+			t[key] = maxf(float(value), 1.0)
+		"icon":
+			if str(value) == "":
+				t.erase("icon")
+			else:
+				t["icon"] = str(value)
+		"colour", "far_color":
+			var c := str(value) if value != null else ""
+			if c == "":
+				t.erase(key)
+			elif not (c.begins_with("#") and Color.html_is_valid(c)):
+				return "a colour is written #rrggbb (%s)" % c
+			else:
+				t[key] = c
+		_:
+			return "%s is not a type setting" % key
+	return ""
+
+
+## Type `id`'s style: every value that still applies kept; leaving a grid without a density takes it from the pitch.
+func set_style(id: int, style: String) -> String:
+	var t := type_of(id)
+	if t.is_empty():
+		return "there is no type %d" % id
+	if not (style in TypesRes.STYLES):
+		return "style %s is not one of %s" % [style, ", ".join(TypesRes.STYLES)]
+	if style != "grid" and float(t.get("density_per_m2", 0.0)) <= 0.0:
+		var pm := float(t.get("pitch_m", TypesRes.DEFAULT_PITCH_M))
+		t["density_per_m2"] = 1.0 / (pm * pm)
+	t["style"] = style
+	return ""
+
+
+## Lane `lane` of type `id` set to `entries`, its own mix from now on; of the Defaults row (id 0): the map's own pool
+## of the lane's default name.
+func set_lane(id: int, lane: String, entries: Array) -> String:
+	if id == 0:
+		var group := "dead" if is_dead(lane) else "species"
+		if typeof(doc.get(group)) != TYPE_DICTIONARY:
+			doc[group] = {}
+		(doc[group] as Dictionary)[default_pool(lane)] = entries
+		return ""
+	var t := type_of(id)
+	if t.is_empty():
+		return "there is no type %d" % id
+	_put_own(t, lane, entries)
+	return ""
+
+
+## Lane `lane` of type `id` back to what it inherits (its own mix dropped, `mixes` with it once empty); of the Defaults
+## row: the map's own pool dropped, so the fallback flora's grows.
+func reset_lane(id: int, lane: String) -> String:
+	if id == 0:
+		var pools = doc.get("dead" if is_dead(lane) else "species")
+		if typeof(pools) == TYPE_DICTIONARY:
+			(pools as Dictionary).erase(default_pool(lane))
+		return ""
+	var t := type_of(id)
+	if t.is_empty():
+		return "there is no type %d" % id
+	var m = t.get("mixes")
+	if typeof(m) != TYPE_DICTIONARY:
+		return ""
+	if is_dead(lane):
+		var dm = (m as Dictionary).get("dead")
+		if typeof(dm) == TYPE_DICTIONARY:
+			(dm as Dictionary).erase(lane.substr(5))
+			if (dm as Dictionary).is_empty():
+				(m as Dictionary).erase("dead")
+	else:
+		(m as Dictionary).erase(lane)
+	if (m as Dictionary).is_empty():
+		t.erase("mixes")
+	return ""
+
+
+## Species `sp` added to lane `lane` of type `id`: an inheriting lane first takes a copy of what it inherits; a weighted
+## lane's new entry weighs the lane's mean (1 in an empty lane), a dead row's has no weight. One already there is
+## refused.
+func add_to_lane(id: int, lane: String, sp: String) -> String:
+	var entries: Array = lane_of(id, lane)["entries"]
+	if names_in(entries).has(sp):
+		return "%s is already in that lane" % sp
+	entries.append(sp if is_dead(lane) else [sp, mean_weight(entries)])
+	return set_lane(id, lane, entries)
+
+
+## Species `sp` taken out of lane `lane` of type `id` (an inheriting lane gets its own mix without it).
+func remove_from_lane(id: int, lane: String, sp: String) -> String:
+	var entries: Array = lane_of(id, lane)["entries"]
+	if not names_in(entries).has(sp):
+		return "%s is not in that lane" % sp
+	return set_lane(id, lane, entries.filter(func(e) -> bool: return _name(e) != sp))
+
+
+## Species `sp`'s weight in lane `lane` of type `id`, clamped to WEIGHT_MIN-WEIGHT_MAX.
+func set_weight(id: int, lane: String, sp: String, w: float) -> String:
+	if is_dead(lane):
+		return "a dead row has no weights"
+	var entries: Array = lane_of(id, lane)["entries"]
+	if not names_in(entries).has(sp):
+		return "%s is not in that lane" % sp
+	for i in entries.size():
+		if _name(entries[i]) == sp:
+			entries[i] = [sp, clampf(w, WEIGHT_MIN, WEIGHT_MAX)]
+	return set_lane(id, lane, entries)
+
+
+## Species `sp` moved from lane `from_lane` to `to_lane` of type `id`: weighted to weighted keeps its weight; into a dead
+## row bare; from a dead row at the target's mean weight. Onto its own lane: nothing; onto a lane that has it: refused.
+func move_between(id: int, from_lane: String, to_lane: String, sp: String) -> String:
+	if from_lane == to_lane:
+		return ""
+	var src: Array = lane_of(id, from_lane)["entries"]
+	var dst: Array = lane_of(id, to_lane)["entries"]
+	if not names_in(src).has(sp):
+		return "%s is not in that lane" % sp
+	if names_in(dst).has(sp):
+		return "%s is already in that lane" % sp
+	var w := mean_weight(dst)
+	for e in src:
+		if _name(e) == sp and typeof(e) == TYPE_ARRAY and (e as Array).size() > 1:
+			w = float(e[1])
+	dst.append(sp if is_dead(to_lane) else [sp, w])
+	var why := set_lane(id, from_lane, src.filter(func(e) -> bool: return _name(e) != sp))
+	return why if why != "" else set_lane(id, to_lane, dst)
+
+
+## Lane `lane` of type `id` set to a copy of lane `from_lane` of type `from_id` (0: the Defaults row): a dead row takes
+## the names, a weighted lane takes a dead row's names at weight 1.
+func copy_lane(id: int, lane: String, from_id: int, from_lane: String) -> String:
+	var src: Array = lane_of(from_id, from_lane)["entries"]
+	var out := []
+	for e in src:
+		if is_dead(lane):
+			out.append(_name(e))
+		else:
+			out.append(e if typeof(e) == TYPE_ARRAY else [_name(e), 1.0])
+	return set_lane(id, lane, out)
+
+
+## The species a lane's entries name, in order.
+static func names_in(entries: Array) -> PackedStringArray:
+	var out := PackedStringArray()
+	for e in entries:
+		out.append(_name(e))
+	return out
+
+
+## A lane's mean weight, snapped to 0.1 and within WEIGHT_MIN-WEIGHT_MAX (a bare entry weighs 1); 1 for an empty lane.
+static func mean_weight(entries: Array) -> float:
+	if entries.is_empty():
+		return 1.0
+	var tot := 0.0
+	for e in entries:
+		tot += float(e[1]) if typeof(e) == TYPE_ARRAY and (e as Array).size() > 1 else 1.0
+	return clampf(snappedf(tot / entries.size(), 0.1), WEIGHT_MIN, WEIGHT_MAX)
+
+
+## The bands, the forest's own for any the profile lacks.
+func bands() -> Dictionary:
+	var out: Dictionary = BAND_DEFAULTS.duplicate()
+	var b = doc.get("bands")
+	if typeof(b) == TYPE_DICTIONARY:
+		for k in BAND_DEFAULTS:
+			if (b as Dictionary).has(k):
+				out[k] = float(b[k])
+	return out
+
+
+## Band `key` set: the coast's top under the mid's, the mid's under the treeline; the share kept above the treeline 0-1.
+func set_band(key: String, value: float) -> String:
+	if not BAND_DEFAULTS.has(key):
+		return "%s is not a band" % key
+	var b := bands()
+	b[key] = value
+	if key == "treeline_keep":
+		if value < 0.0 or value > 1.0:
+			return "the share kept above the treeline is 0-100 %"
+	elif not (float(b["coast_top_m"]) < float(b["mid_top_m"]) and float(b["mid_top_m"]) < float(b["treeline_m"])):
+		return "the bands must climb: the coast's top under the mid's, the mid's under the treeline"
+	if typeof(doc.get("bands")) != TYPE_DICTIONARY:
+		doc["bands"] = {}
+	(doc["bands"] as Dictionary)[key] = value
+	return ""
+
+
+func _list() -> Array:
+	if typeof(doc.get("types")) != TYPE_ARRAY:
+		doc["types"] = []
+	return doc["types"]
+
+
+static func _name(e) -> String:
+	return str(e[0]) if typeof(e) == TYPE_ARRAY else str(e)
