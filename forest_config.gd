@@ -174,16 +174,16 @@ static func discovered_set_paths(addons_dir := "res://addons") -> PackedStringAr
 ## The built-in starter pack, beside ForestConfig's own script (whatever the addon's folder is called, and whatever
 ## folder a subclass lives in).
 func starter_pack_path() -> String:
-	return _addon_dir().path_join("packs/starter/starter.tres")
+	return addon_dir().path_join("packs/starter/starter.tres")
 
 
 ## The starter pack's flora: the fallback flora when the config names none and the starter is not disabled.
 func starter_flora_path() -> String:
-	return _addon_dir().path_join("packs/starter/starter_flora.json")
+	return addon_dir().path_join("packs/starter/starter_flora.json")
 
 
 ## The addon's folder: ForestConfig's own script's, never a subclass's.
-static func _addon_dir() -> String:
+static func addon_dir() -> String:
 	return (ForestConfig as Script).resource_path.get_base_dir()
 
 

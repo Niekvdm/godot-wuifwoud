@@ -262,7 +262,7 @@ func grows(id: String, pack) -> bool:
 
 ## A pack that ships inside Wuifwoud (the starter): shown, switched on and off, never edited.
 func is_read_only(pack) -> bool:
-	var dir := ForestConfig._addon_dir() + "/"
+	var dir := ForestConfig.addon_dir() + "/"
 	return String(pack.resource_path).begins_with(dir)
 
 

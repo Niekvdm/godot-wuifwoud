@@ -4,7 +4,7 @@
 extends RefCounted
 ## The Types dialog's species strip, under the lanes: every species the forest grows as a picture tile, a search (id and
 ## name) and the chips All · Trees · Bushes. Drag a tile onto a lane to add it there, or click it to add it to the lane
-## in focus.
+## in focus; a search fills the tiles again alone.
 
 ## A species tile.
 const SpeciesTileRes := preload("res://addons/wuifwoud/editor/common/forest_species_tile.gd")
@@ -45,15 +45,29 @@ static func build(d) -> Control:
 	var row := HBoxContainer.new()
 	row.name = "StripTiles"
 	row.add_theme_constant_override("separation", 4)
+	sc.add_child(row)
+	v.add_child(sc)
+	var empty: Label = d.hint("")
+	empty.name = "StripEmpty"
+	v.add_child(empty)
+	v.add_child(d.hint("Drag a species onto a lane, or click it to add it to %s. Drop a lane's species on this column's empty space to take it out of its lane." % d.focus_title()))
+	fill(d, v)
+	return v
+
+
+## The strip's tiles for the dialog's search and filter (`v`: build()'s): its row filled again, the "no species" line
+## shown when none matches. The search field and the rest of the dialog stay as they are.
+static func fill(d, v: Control) -> void:
+	var row := v.find_child("StripTiles", true, false) as HBoxContainer
+	for c in row.get_children():
+		row.remove_child(c)
+		c.queue_free()
 	var ids: PackedStringArray = d.strip_ids()
 	for id in ids:
 		var t = SpeciesTileRes.new().setup(d.kit, VA.species_of(id), VA.built_dir_of(id), "built", true, false, d.accent, PX)
 		t.pressed.connect(d.strip_click.bind(String(id)))
 		row.add_child(t)
-	sc.add_child(row)
-	v.add_child(sc)
-	if ids.is_empty():
-		v.add_child(d.hint("No species matches." if d.strip_search != "" or d.strip_filter != "all"
-			else "No species grows: switch a species pack on in Forest → Species…."))
-	v.add_child(d.hint("Drag a species onto a lane, or click it to add it to %s." % d.focus_title()))
-	return v
+	var empty := v.find_child("StripEmpty", true, false) as Label
+	empty.text = "No species matches." if d.strip_search != "" or d.strip_filter != "all" \
+		else "No species grows: switch a species pack on in Forest → Species…."
+	empty.visible = ids.is_empty()

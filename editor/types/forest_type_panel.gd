@@ -161,7 +161,10 @@ static func _far(d, id: int, t: Dictionary) -> Control:
 	if not from_bake and Color.html_is_valid(str(t["far_color"])):
 		cp.color = Color.html(str(t["far_color"]))
 	cp.disabled = from_bake
-	cp.popup_closed.connect(func() -> void: d.set_value(id, "far_color", "#" + cp.color.to_html(false)))
+	var shown := cp.color.to_html(false)
+	cp.popup_closed.connect(func() -> void:
+		if cp.color.to_html(false) != shown:
+			d.set_value(id, "far_color", "#" + cp.color.to_html(false)))
 	var bake: Button = d.kit.toggle_chip("From the bake", from_bake, d.accent)
 	bake.name = "FarFromBake"
 	bake.tooltip_text = "The far forest's colour for this type: its species' bakes, or a colour of its own"

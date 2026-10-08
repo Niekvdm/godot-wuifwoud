@@ -709,18 +709,12 @@ func strip_click(id: String) -> void:
 		add_to_lane(lane_focus, id)
 
 
-## A search keystroke: the view is rebuilt after the field's signal (never inside it) and the new field keeps the typing.
+## A search keystroke: the strip's tiles alone are filled again (the field keeps its focus and caret).
 func strip_search_changed(t: String) -> void:
 	strip_search = t
-	_apply_strip_search.call_deferred()
-
-
-func _apply_strip_search() -> void:
-	rebuild()
-	var f := _content.find_child("StripSearch", true, false) as LineEdit
-	if f != null and f.is_inside_tree():
-		f.grab_focus()
-		f.caret_column = f.text.length()
+	var strip := _content.find_child("Strip", true, false) as Control
+	if strip != null:
+		StripRes.fill(self, strip)
 
 
 ## Show only some species in the strip.

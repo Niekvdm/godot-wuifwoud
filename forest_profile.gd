@@ -107,7 +107,7 @@ static func problem_of(d: Dictionary) -> String:
 
 ## Whether profile `p` ships inside Wuifwoud (the starter flora): shown, never written.
 static func is_read_only(p: String) -> bool:
-	return p.begins_with(ForestConfig._addon_dir() + "/")
+	return p.begins_with(ForestConfig.addon_dir() + "/")
 
 
 ## The file's text: the document with its keys in their order, two-space indents, an array of plain values (a pool
@@ -120,7 +120,10 @@ func text() -> String:
 ## changed on disk since it was read (an edit made in a text editor is not overwritten: reopen it).
 func write() -> Error:
 	problem = ""
-	if path == "" or is_read_only(path):
+	if path == "":
+		problem = "the profile has no file yet: save it first"
+		return ERR_FILE_BAD_PATH
+	if is_read_only(path):
 		problem = "%s is read-only" % path
 		return ERR_FILE_NO_PERMISSION
 	if FileAccess.file_exists(path) and FileAccess.get_file_as_string(path) != _disk:
@@ -195,13 +198,24 @@ func types() -> Array:
 	return t if typeof(t) == TYPE_ARRAY else []
 
 
-## The type ids in the profile's order (entries without a whole-number id left out).
+## The type ids in the profile's order: whole numbers 1-255, each once (an entry without one, or repeating one, is the
+## forest's to refuse, not a row of its own).
 func type_ids() -> PackedInt32Array:
 	var out := PackedInt32Array()
 	for t in types():
 		if typeof(t) == TYPE_DICTIONARY and typeof(t.get("id")) == TYPE_INT:
-			out.append(int(t["id"]))
+			var id := int(t["id"])
+			if id >= 1 and id <= ID_MAX and not out.has(id):
+				out.append(id)
 	return out
+
+
+## Whether entry `t` is one the forest loads by its id and its style (the rest it refuses: they are left as written).
+static func loadable(t) -> bool:
+	if typeof(t) != TYPE_DICTIONARY:
+		return false
+	var idv = t.get("id")
+	return typeof(idv) == TYPE_INT and int(idv) >= 1 and int(idv) <= ID_MAX and str(t.get("style", "")) in TypesRes.STYLES
 
 
 ## Type `id`'s entry ({}: none).
@@ -358,12 +372,13 @@ static func _drop_ref(t: Dictionary, lane: String) -> void:
 ## Every old reference to a pool not named for its lane becomes the type's own mix, a copy of that pool as the forest
 ## resolves it (the profile's, else the fallback flora's), and the reference goes; one whose lane already has an own mix
 ## just goes; one to a pool no one has stays (the forest names it); one naming its lane's default stays. Then a pool that
-## only those references named goes too, unless a lane defaults to it. What it did: a line a type, a line a pool.
+## only those references named goes too, unless a lane defaults to it. What it did: a line a type, a line a pool. An
+## entry the forest refuses is left as it is.
 func convert_legacy() -> PackedStringArray:
 	var said := PackedStringArray()
 	var named := {}            # "species/<pool>" | "dead/<pool>" -> true: named by a converted reference
 	for t in types():
-		if typeof(t) != TYPE_DICTIONARY:
+		if not loadable(t):
 			continue
 		var lanes := PackedStringArray()
 		var from := PackedStringArray()

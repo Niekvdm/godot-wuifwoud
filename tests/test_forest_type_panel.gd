@@ -88,6 +88,11 @@ static func run() -> Dictionary:
 	(d.find_child("FarFromBake", true, false) as Button).toggled.emit(false)
 	_chk(r, "the far colour off the bake writes the picker's colour",
 		String(_on_disk(path, 1).get("far_color", "")).begins_with("#"))
+	d.set_value(1, "far_color", "#3F7D4C")
+	var steps: int = d._undo.size()
+	(d.find_child("FarColour", true, false) as ColorPickerButton).popup_closed.emit()
+	_chk(r, "the far colour's picker closed without a change writes nothing (a hand-written #3F7D4C kept)",
+		_on_disk(path, 1).get("far_color") == "#3F7D4C" and d._undo.size() == steps)
 	(d.find_child("FarFromBake", true, false) as Button).toggled.emit(true)
 	_chk(r, "back on the bake takes it out", not _on_disk(path, 1).has("far_color"))
 	(d.find_child("Style", true, false).get_node("Seg2") as Button).pressed.emit()

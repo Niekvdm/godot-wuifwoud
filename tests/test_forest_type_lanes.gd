@@ -22,6 +22,11 @@ static func _chk(r: Dictionary, n: String, ok: bool) -> void:
 		r.details.append("✗ " + n)
 
 
+static func _frames(n: int) -> void:
+	for i in n:
+		await (Engine.get_main_loop() as SceneTree).process_frame
+
+
 static func _disk(path: String) -> Dictionary:
 	var v = JSON.parse_string(FileAccess.get_file_as_string(path))
 	return v if v is Dictionary else {}
@@ -135,11 +140,19 @@ static func run() -> Dictionary:
 	d.set_strip_filter("bushes")
 	_chk(r, "Bushes", _strip(d) == ["W_Bush"])
 	d.set_strip_filter("all")
+	var field_before: Node = d.find_child("StripSearch", true, false)
+	var lanes_before: Node = d.find_child("Lanes", true, false)
 	d.strip_search_changed("new")
-	d._apply_strip_search()
+	await _frames(2)
 	_chk(r, "the search", _strip(d) == ["W_New"])
+	_chk(r, "a search keystroke fills the strip again alone: the field and the lanes stay the same nodes",
+		is_same(field_before, d.find_child("StripSearch", true, false)) and is_same(lanes_before, d.find_child("Lanes", true, false)))
 	d.strip_search_changed("")
-	d._apply_strip_search()
+	await _frames(2)
+	var strip_node: Node = d.find_child("Strip", true, false)
+	_chk(r, "the strip says where a lane's species is dropped to leave its lane",
+		strip_node != null and strip_node.find_children("*", "Label", true, false).any(
+			func(l): return (l as Label).text.contains("take it out of its lane")))
 	d.focus_lane("mid")
 	(d.find_child("StripTiles", true, false).get_child(0) as Button).pressed.emit()
 	_chk(r, "a strip tile clicked joins the lane in focus (the Defaults' mid: the map's own pool)",

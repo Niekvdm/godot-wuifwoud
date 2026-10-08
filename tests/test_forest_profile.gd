@@ -126,7 +126,8 @@ static func run() -> Dictionary:
 		and back["_comment"] == PF.LEGACY["_comment"] and back["_comment_types"] == "kept where it is")
 	_chk(r, "ids whole, other whole numbers with a decimal, a pool entry on one line, two-space indents, full precision",
 		txt.contains("\"id\": 1,") and txt.contains("[\"W_Tree\", 2.0]") and txt.contains("\n  \"bands\": {")
-		and txt.contains("\"pitch_m\": 6.0") and txt.contains("0.0028571428571"))
+		and txt.contains("\"pitch_m\": 6.0") and txt.contains("\"density_per_m2\": 0.0028571428571\n")
+		and float(back["types"][1]["density_per_m2"]) == 0.0028571428571)
 	_chk(r, "quotes, a backslash and non-ASCII survive; a type the forest refuses is written as it was",
 		back["types"][4]["name"] == "Ridge \"north\"" and String(back["_comment"]).contains("back\\slash")
 		and String(back["_comment"]).contains("ünïcode") and back["types"][5] == {"name": "No id", "style": "natural"})
@@ -155,5 +156,26 @@ static func run() -> Dictionary:
 		and FileAccess.get_file_as_string(path).contains("Heath"))
 	_chk(r, "the bands' defaults are the forest's", ProfileRes.BAND_DEFAULTS == {"coast_top_m": Veg._COAST_M,
 		"mid_top_m": Veg._MID_M, "treeline_m": Veg._TREELINE_M, "treeline_keep": Veg._TREELINE_KEEP})
+	# ── type ids, refused entries, a profile without a file, the addon's folder ──
+	var pi = ProfileRes.new()
+	pi.open_text(JSON.stringify({"types": [{"id": 0, "name": "Zero", "style": "natural"},
+		{"id": 5, "name": "A", "style": "natural"}, {"id": 5, "name": "B", "style": "natural"},
+		{"id": 300, "name": "Big", "style": "natural"}, {"id": 6, "name": "C", "style": "bushes"}]}), {})
+	_chk(r, "type ids: whole numbers 1-255, each once, in the profile's order (%s)" % str(pi.type_ids()),
+		Array(pi.type_ids()) == [5, 6])
+	var pc = ProfileRes.new()
+	pc.open_text(JSON.stringify({"species": {"spare": [["W_A", 1.0]]}, "types": [
+		{"name": "No id", "style": "natural", "pools": {"high": "spare"}},
+		{"id": 2, "name": "Odd", "style": "weird", "pools": {"high": "spare"}}]}), {})
+	_chk(r, "the conversion leaves an entry the forest refuses as it was, and the pool it names (%s)" % str(pc.converted),
+		pc.converted.is_empty() and (pc.types()[0] as Dictionary).has("pools") and not (pc.types()[0] as Dictionary).has("mixes")
+		and (pc.types()[1] as Dictionary).has("pools") and (pc.doc["species"] as Dictionary).has("spare"))
+	var pn = ProfileRes.new()
+	pn.open_text("{}", {})
+	var en: Error = pn.write()
+	_chk(r, "a profile with no file yet is not written, and says so (%s)" % pn.problem,
+		en != OK and String(pn.problem).contains("no file"))
+	_chk(r, "the addon's folder, public (%s)" % ForestConfig.addon_dir(),
+		ForestConfig.addon_dir() == "res://addons/wuifwoud" and ProfileRes.is_read_only(STARTER_FLORA))
 	TreeFix.rm_tree(ROOT)
 	return r
