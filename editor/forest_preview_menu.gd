@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 @tool
 extends MenuButton
-## The 3D editor's "Forest" menu: show or hide the forest preview, re-grow it, and build the species packs. Writes
+## The 3D editor's "Forest" menu: show or hide the forest preview, re-grow it, and open the Species dialog. Writes
 ## ForestPreview.visible; `changed` tells the plugin to keep it in the project's
 ## editor metadata.
 
@@ -10,8 +10,8 @@ extends MenuButton
 signal changed
 ## Re-grow chosen.
 signal regrow_requested
-## Build packs… chosen.
-signal build_requested
+## Species… chosen.
+signal species_requested
 
 ## The editor preview's switch.
 const ForestPreviewRes := preload("res://addons/wuifwoud/forest_preview.gd")
@@ -19,8 +19,8 @@ const ForestPreviewRes := preload("res://addons/wuifwoud/forest_preview.gd")
 const ID_SHOW := 0
 ## Re-grow's id.
 const ID_REGROW := 1
-## Build packs…'s id.
-const ID_BUILD := 2
+## Species…'s id.
+const ID_SPECIES := 2
 
 
 func _init() -> void:
@@ -31,7 +31,7 @@ func _init() -> void:
 	p.add_check_item("Show forest", ID_SHOW)
 	p.add_item("Re-grow", ID_REGROW)
 	p.add_separator()
-	p.add_item("Build packs…", ID_BUILD)
+	p.add_item("Species…", ID_SPECIES)
 	p.id_pressed.connect(_on_id)
 	sync()
 
@@ -49,5 +49,5 @@ func _on_id(id: int) -> void:
 		changed.emit()
 	elif id == ID_REGROW:
 		regrow_requested.emit()
-	elif id == ID_BUILD:
-		build_requested.emit()
+	elif id == ID_SPECIES:
+		species_requested.emit()

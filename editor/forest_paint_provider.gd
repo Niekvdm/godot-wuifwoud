@@ -17,6 +17,8 @@ signal tool_done(tool_id: String)
 signal library_changed
 ## "Import…": the plugin opens the dialog.
 signal import_requested
+## "Species…": the plugin opens the Species dialog.
+signal species_requested
 
 ## The texel rules.
 const ForestBrushRes := preload("res://addons/wuifwoud/forest_brush.gd")
@@ -240,7 +242,8 @@ func build_header(box: VBoxContainer, kit: Object, _accent: Color) -> void:
 
 ## The ⋯ menu's actions.
 func workspace_actions() -> Array:
-	return [{"id": "import", "title": "Import…", "tooltip": "This map's import mapping: edit it and run the import"},
+	return [{"id": "species", "title": "Species…", "tooltip": "Every species pack: browse, edit, switch on and off, build"},
+		{"id": "import", "title": "Import…", "tooltip": "This map's import mapping: edit it and run the import"},
 		{"id": "restore", "title": "Restore deleted imports", "tooltip": "Bring back the single trees and rows deleted from the import"},
 		{"id": "reload", "title": "Reload types", "tooltip": "Read the flora profile again and re-grow the forest"},
 		{"id": "regrow", "title": "Re-grow all", "tooltip": "Grow the whole preview again from the maps"}]
@@ -248,6 +251,9 @@ func workspace_actions() -> Array:
 
 ## Run a ⋯ menu action.
 func workspace_action(p_id: String) -> void:
+	if p_id == "species":
+		species_requested.emit()
+		return
 	if p_id == "import":
 		import_requested.emit()
 		return

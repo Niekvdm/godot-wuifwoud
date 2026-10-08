@@ -3,8 +3,8 @@
 extends SceneTree
 ## Builds species packs from the command line: every species that needs it (or every one, --all, or those named,
 ## --species <id>[,<id>…]) of the packs the project grows, or of one pack or pack set (--pack
-## <res path>): prepared, its impostor baked, landed in the pack's built/. The same job as the editor's Forest → Build
-## packs….
+## <res path>): prepared, its impostor baked and its picture rendered, landed in the pack's built/. The same job as the
+## editor's Forest → Species… (Build what's needed).
 ##
 ##   godot --path . --display-driver x11 --rendering-driver vulkan --resolution 256x256 --position -6000,-6000 \
 ##       --script res://addons/wuifwoud/tools/build_packs.gd -- [--pack <res://…/pack.tres>] [--species <id>] [--all]

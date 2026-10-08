@@ -79,7 +79,7 @@ static func run() -> Dictionary:
 	_chk(r, "the starter's species are read-only: the note, no settings",
 		d2.find_child("ReadOnly", true, false) != null and d2.find_child("TrunkRadius", true, false) == null)
 	d2.free()
-	var ad := {"name": "Woods", "kind": "addon", "path": "res://addons/woods/wuifwoud_packs.tres", "enabled": true,
+	var ad := {"name": "Woods", "kind": "addon", "path": "res://addons/wuifwoud/tests/fixtures/woods/wuifwoud_packs.tres", "enabled": true,
 		"packs": [{"pack": fx["other"], "enabled": true}]}
 	var an: Array = Fix.dialog(fx, false, {"sources_of": func() -> Array: return [ad]})
 	var d3 = an[0]

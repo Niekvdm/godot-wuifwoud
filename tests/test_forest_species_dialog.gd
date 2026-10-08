@@ -77,7 +77,7 @@ static func run() -> Dictionary:
 	var depth: int = d._undo.size()
 	var keep_path: String = d.config_path
 	d.config.resource_path = ""
-	d.config_path = "res://no/such/folder/config.tres"
+	d.config_path = ROOT + "/no/such/folder/config.tres"
 	d.set_pack_enabled(d.sources[1], fx["other"], false)
 	_chk(r, "a failed write is said and undone, the undo stack unchanged (%s)" % d.error,
 		d.error.begins_with("Could not write") and not d.config.disabled_packs.has(other_path) and d._undo.size() == depth)

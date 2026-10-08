@@ -141,7 +141,7 @@ godot --headless --script res://addons/wuifwoud/tools/import_forest.gd -- --mapp
 
 With the plugin enabled, the forest grows around the editor camera.
 
-- **The Forest menu** (3D view toolbar): *Show forest*, *Re-grow*, *Build packs…*.
+- **The Forest menu** (3D view toolbar): *Show forest*, *Re-grow*, *Species…*.
 - **The Forest workspace** (Terrain3D Extended's rail):
 
   | Tool | Does |
@@ -216,8 +216,14 @@ pack wins.
 A pack's build writes each species' meshes and impostor sheets into `built/` beside the pack, with `built.json`. The
 forest loads built species; an unbuilt one is prepared when the forest starts, without an impostor.
 
-- **Forest → Build packs…** lists each species' state (built, not built, needs building, mesh missing) and builds what
-  is needed, or everything.
+- **Forest → Species…** (also the workspace's ⋯, and *Open in the Species dialog* in the inspector of a species or a
+  pack) lists every species pack the project grows, the starter and pack addons included, each species as its picture.
+  Search and filter, switch a pack or a species off (the config's `disabled_packs` and `disabled_species`; a species
+  switched off leaves every mix), edit a species' settings, add one from a mesh (*+ Add species…*), take one out of
+  its pack (its file stays), and build: a species, a pack, what's needed or everything. The selected species turns in a
+  live 3D view; *⤢ Inspect* widens it to compare the model with its impostor card out to the hand-over distance and to
+  show the bake's sheets. Every change is undoable in the dialog and written at once. The starter pack is read-only.
+- The pack build renders each species' picture (`built/<id>_picture.res`) beside its impostor sheets.
 - **Command line** (windowed, not headless: the bake needs a renderer):
 
   ```

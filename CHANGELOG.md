@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- The Species dialog (Forest → Species…, the workspace's ⋯, the inspector): every pack and species as pictures,
+  search and filters, species and packs switched on and off, a species' settings, Add species from a mesh, Remove from
+  pack, building per species, per pack or all; a live 3D view and Inspect (the model against its impostor card, the
+  bake's sheets). It replaces Build packs….
+- Species pictures: the pack build renders one a species (`built/<id>_picture.res`); a pack built before needs
+  building once.
+- `ForestConfig.disabled_species`: a species switched off leaves every mix (the rest share its weight); a single tree
+  pinned to it grows its type's pick.
+
 ## 1.0.0 (2026-10-08)
 
 The first release.

@@ -181,8 +181,8 @@ static func run() -> Dictionary:
 	p.import_requested.connect(func() -> void: opened[0] += 1)
 	var acts: Array = p.workspace_actions().map(func(a): return a["id"])
 	p.workspace_action("import")
-	_chk(r, "the panel's ⋯ has Import… first, Restore deleted imports next, and Import… asks the plugin for the dialog (%s)" % str(acts),
-		acts == ["import", "restore", "reload", "regrow"] and opened[0] == 1)
+	_chk(r, "the panel's ⋯ has Species… first, Import… next, Restore deleted imports after, and Import… asks the plugin for the dialog (%s)" % str(acts),
+		acts == ["species", "import", "restore", "reload", "regrow"] and opened[0] == 1)
 
 	# ── while an import runs no stroke lands; the note says how far it is ──
 	p.importing = func() -> Dictionary: return {"phase": "regions", "done": 3, "total": 9}

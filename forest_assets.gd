@@ -970,7 +970,7 @@ static func _built_species(mesh_name: String):
 	if e.is_empty() or int(e.get("prep_version", -1)) != PREP_VERSION or not ResourceLoader.exists(path):
 		if not _unbuilt_warned.has(dir):
 			_unbuilt_warned[dir] = true
-			ForestLog.warn("[Wuifwoud] the species pack at %s is not built (or is out of date): its species are prepared when the forest starts. Build it: Forest → Build packs…, or res://addons/wuifwoud/tools/build_packs.gd"
+			ForestLog.warn("[Wuifwoud] the species pack at %s is not built (or is out of date): its species are prepared when the forest starts. Build it: Forest → Species… (Build what's needed), or res://addons/wuifwoud/tools/build_packs.gd"
 				% dir.get_base_dir())
 		return null
 	var b = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_REPLACE)

@@ -6,7 +6,7 @@ extends Resource
 ## A pack of tree and bush species: its name, credits and species, in the order a library lists
 ## them. A project lists its packs in ForestConfig.packs, or installs them as a pack addon (a ForestPackSet at
 ## res://addons/<name>/wuifwoud_packs.tres). A BUILT pack keeps each species' prepared meshes, impostor atlases and
-## built.json in built/ beside this file (Forest → Build packs…, or res://addons/wuifwoud/tools/build_packs.gd).
+## built.json in built/ beside this file (Forest → Species…, or res://addons/wuifwoud/tools/build_packs.gd).
 
 ## The built folder's name, beside the pack's file.
 const BUILT := "built"

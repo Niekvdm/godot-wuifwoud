@@ -3,13 +3,14 @@
 @tool
 extends EditorPlugin
 ## Wuifwoud in the editor: the Forest menu (the preview switch, kept in the project's editor metadata and never in a
-## scene; Re-grow; Build packs…), the Forest workspace in Terrain3D Extended when it is installed (1.2 or newer), the
+## scene; Re-grow; Species…), the Forest workspace in Terrain3D Extended when it is installed (1.2 or newer), the
 ## painted forest maps and the single trees and rows (trees.json) saved with the scene, and the Import dialog, opened
 ## from the workspace's ⋯, whose import runs on a worker this plugin polls every frame; when it lands, every forest map
 ## and trees file of that folder in the editor catches up (the unsaved edits were handed to the import). The forest node
 ## is @tool on its own: without this plugin it still previews, and nothing paints, places or imports. The edited
-## scene's forest is found by ForestFinder. Build packs… opens the pack dialog, and the build it starts is polled here
-## every frame; when it lands the packs are resolved again and the scene's forest regrows.
+## scene's forest is found by ForestFinder. Species… (the menu, the workspace's ⋯, the inspector of a species or a pack)
+## opens the Species dialog; a build it starts is polled here every frame, and when it lands, or when the dialog changes
+## a species, a pack or the config, the packs are resolved again and the scene's forest regrows.
 
 ## The project's editor metadata section the plugin keeps its settings in.
 const SECTION := "wuifwoud"
@@ -43,8 +44,14 @@ const ForestTreesRes := preload("res://addons/wuifwoud/forest_trees.gd")
 const FinderRes := preload("res://addons/wuifwoud/editor/forest_finder.gd")
 ## A pack build.
 const BuildRes := preload("res://addons/wuifwoud/species/forest_pack_build.gd")
-## The Build packs dialog.
-const BuildDialogRes := preload("res://addons/wuifwoud/editor/forest_pack_dialog.gd")
+## The Species dialog.
+const SpeciesDialogRes := preload("res://addons/wuifwoud/editor/species/forest_species_dialog.gd")
+## Its building blocks.
+const KitRes := preload("res://addons/wuifwoud/editor/common/forest_kit.gd")
+## What uses each species.
+const UseRes := preload("res://addons/wuifwoud/editor/species/forest_species_use.gd")
+## The inspector's species and pack box.
+const InspectorRes := preload("res://addons/wuifwoud/editor/forest_species_inspector.gd")
 ## The species' assets (their caches).
 const ForestAssetsRes := preload("res://addons/wuifwoud/forest_assets.gd")
 
@@ -54,7 +61,9 @@ var _finder = FinderRes.new()   # the edited scene's forest
 var _dialog: Control = null
 var _job = null                 # the running or last import (ForestImportJob)
 var _build = null               # the running or last pack build (ForestPackBuild)
-var _build_dialog: Control = null
+var _species_dialog: Control = null
+var _inspector = null
+var _regrow_at := -1         # when the Species dialog's last change asks the forest to grow again (ms; -1: none)
 var _reader = ReaderRes.new()   # shared by the Import dialog and the Revert brush
 var _picker: EditorFileDialog = null
 var _doc := {"key": "", "doc": {}}   # the edited scene's mapping for the Revert brush; key "": read it again
@@ -70,7 +79,10 @@ func _enter_tree() -> void:
 	_menu = MenuRes.new()
 	_menu.changed.connect(_on_menu_changed)
 	_menu.regrow_requested.connect(_regrow)
-	_menu.build_requested.connect(_open_build)
+	_menu.species_requested.connect(open_species)
+	_inspector = InspectorRes.new()
+	_inspector.open = open_species
+	add_inspector_plugin(_inspector)
 	add_control_to_container(CONTAINER_SPATIAL_EDITOR_MENU, _menu)
 	_register_paint.call_deferred()
 
@@ -86,9 +98,12 @@ func _exit_tree() -> void:
 		_build.cancel()
 		while not _build.poll():     # a running store is image work: it ends on its own
 			OS.delay_msec(5)
-	if _build_dialog != null and is_instance_valid(_build_dialog):
-		_build_dialog.queue_free()
-	_build_dialog = null
+	if _species_dialog != null and is_instance_valid(_species_dialog):
+		_species_dialog.queue_free()
+	_species_dialog = null
+	if _inspector != null:
+		remove_inspector_plugin(_inspector)
+	_inspector = null
 	_reader.wait()                  # its worker reads files and calls into scripts this plugin unloads
 	if _dialog != null and is_instance_valid(_dialog):
 		_dialog.queue_free()
@@ -115,14 +130,17 @@ func _process(_dt: float) -> void:
 		EditorInterface.get_base_control().queue_redraw()
 	if _paint != null:
 		_paint.tick()
+	if _regrow_at >= 0 and Time.get_ticks_msec() >= _regrow_at:
+		_regrow_at = -1
+		_regrow()
 
 
 func _on_menu_changed() -> void:
 	EditorInterface.get_editor_settings().set_project_metadata(SECTION, KEY_VISIBLE, ForestPreviewRes.visible)
 
 
-## Forest → Re-grow, and a build's landing: the packs resolved again (a pack or species added since), then the forest
-## grown again from them.
+## Forest → Re-grow, a build's landing and a change in the Species dialog: the packs resolved again (a pack or species
+## added, switched on or off since), then the forest grown again from them.
 func _regrow() -> void:
 	var f := _forest()
 	if f != null:
@@ -147,6 +165,7 @@ func _register_paint() -> void:
 	_paint.importing = func() -> Dictionary: return _job.progress() if _job != null and _job.is_running() else {}
 	_paint.mapping_of = _mapping_doc
 	_paint.import_requested.connect(_open_import)
+	_paint.species_requested.connect(open_species)
 	load(PROVIDERS).register(_paint)
 
 
@@ -242,24 +261,52 @@ func _forest() -> Node:
 	return _finder.find(EditorInterface.get_edited_scene_root())
 
 
-## Forest → Build packs…: the dialog over the editor, one at a time; it lists the packs the project grows.
-func _open_build() -> void:
-	if _build_dialog != null and is_instance_valid(_build_dialog):
+## Forest → Species…, the workspace's ⋯ and the inspector: the dialog over the editor, one at a time, on `select` ("":
+## none).
+func open_species(select := "") -> void:
+	if _species_dialog != null and is_instance_valid(_species_dialog):
+		if select != "":
+			_species_dialog.select(select)
 		return
-	var ctx := BuildDialogRes.context_for(load(UX_COMPONENTS) if ResourceLoader.exists(UX_COMPONENTS) else null)
+	var ctx := SpeciesDialogRes.context_for(KitRes.new(KitRes.overlay()))
 	ctx["run"] = _run_build
 	ctx["job_of"] = func(): return _build
-	_build_dialog = BuildDialogRes.new()
-	_build_dialog.setup(ctx)
-	_build_dialog.closed.connect(func() -> void: _build_dialog = null)
-	EditorInterface.get_base_control().add_child(_build_dialog)
+	ctx["pick_file"] = _pick_file
+	ctx["show_file"] = func(p: String) -> void: EditorInterface.get_file_system_dock().navigate_to_path(p)
+	ctx["uses"] = _species_uses
+	ctx["handover_of"] = _handover
+	_species_dialog = SpeciesDialogRes.new()
+	_species_dialog.setup(ctx)
+	if select != "":
+		_species_dialog.select(select)
+	_species_dialog.changed.connect(func() -> void: _regrow_at = Time.get_ticks_msec() + 250)
+	_species_dialog.closed.connect(func() -> void: _species_dialog = null)
+	EditorInterface.get_base_control().add_child(_species_dialog)
 
 
-## The dialog's Build: a pack build started, its bake under the editor's base control. "" when it started.
-func _run_build(packs: Array, force: bool) -> String:
+## What uses each species in the edited scene's forest: its types' lanes, its mapping's rules, its pinned items.
+func _species_uses() -> Dictionary:
+	var f := _forest()
+	if f == null:
+		return {}
+	var doc := _mapping_doc()
+	return UseRes.of(f._types.by_id, f.trees.items, (doc.get("rules", []) as Array) if doc is Dictionary else [])
+
+
+## A species' mesh-to-card hand-over in the edited scene's forest (the defaults without one).
+func _handover(id: String) -> Dictionary:
+	var f := _forest()
+	if f == null:
+		return ForestAssetsRes.handover_band(300.0, 90.0)
+	return ForestAssetsRes.handover_band(f._species_cut_m(id), f._BILLBOARD_OVERLAP)
+
+
+## The Species dialog's Build: a pack build of `packs` with `options` (ForestPackBuild's: force, only) started, its bake
+## under the editor's base control. "" when it started.
+func _run_build(packs: Array, options: Dictionary) -> String:
 	if _build != null and _build.is_running():
 		return "a build is running"
-	_build = BuildRes.new(packs, {"force": force})
+	_build = BuildRes.new(packs, options)
 	_build.finished.connect(_on_built)
 	_build.start(EditorInterface.get_base_control())
 	return ""
