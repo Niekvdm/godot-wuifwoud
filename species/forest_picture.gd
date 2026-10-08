@@ -60,7 +60,9 @@ func setup(host: Node) -> void:
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(SUN_DEG.x, SUN_DEG.y, 0.0)
 	sun.light_energy = 1.1
-	sun.shadow_enabled = true
+	# NO SHADOW: a shadowed render came out a few pixels different from one build to the next (its filtering), and the
+	# picture must be the same bytes whoever builds it, every time.
+	sun.shadow_enabled = false
 	_vp.add_child(sun)
 	_subject = MeshInstance3D.new()
 	_vp.add_child(_subject)

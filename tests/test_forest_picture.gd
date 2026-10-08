@@ -48,6 +48,13 @@ static func run() -> Dictionary:
 		out.get_width() == PictureRes.PX and out.get_height() == PictureRes.PX
 		and absf(px.a - 0.5) < 1.5 / 255.0 and px.r > 0.98 and px.g < 0.02)
 	_chk(r, "no render, no picture", PictureRes.finish(null) == null)
+	var host := Node.new()
+	var rig = PictureRes.new()
+	rig.setup(host)
+	var suns := host.find_children("*", "DirectionalLight3D", true, false)
+	_chk(r, "the picture's sun casts no shadow (a shadowed render is not the same bytes twice)",
+		suns.size() == 1 and not (suns[0] as DirectionalLight3D).shadow_enabled)
+	host.free()
 
 	# ── built.json asks for it ──
 	TreeFix.rm_tree(ROOT)
