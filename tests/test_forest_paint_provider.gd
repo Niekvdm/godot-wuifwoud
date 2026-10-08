@@ -152,6 +152,10 @@ static func run() -> Dictionary:
 	_chk(r, "a lane's heaviest species, each once, ties in their order",
 		ProviderRes.top_species([["W_A", 1.0], ["W_B", 3.0], ["W_C", 3.0], ["W_A", 2.5], "W_D"], 3)
 		== PackedStringArray(["W_A", "W_B", "W_C"]))
+	_chk(r, "a natural type's card shows a band's dead trees after it, when it has any",
+		ProviderRes.card_lanes({"style": "natural", "bands": {"coast": [], "mid": [["W_Old", 1.0]], "high": []},
+			"bush": [], "dead": {"coast": [], "mid": ["W_Old"], "high": []}}).map(func(l): return l[0])
+		== ["coast", "mid", "dead_mid", "high", "bush"])
 	var bare: Control = ProviderRes._card({"id": 9, "name": "Bare", "style": "mix", "density": 0.01, "pitch": 10.0,
 		"clump": 0.0, "understory": 0.35, "edge_wall_m": 0.0, "edge_wall_mult": 1.0, "tree": [],
 		"bush": [["W_Gone", 1.0]]})

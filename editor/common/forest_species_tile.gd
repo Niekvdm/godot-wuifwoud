@@ -30,6 +30,8 @@ const OFF_ALPHA := 0.42
 
 ## The species' id.
 var id := ""
+## Whether dragging it carries its id (a picker's tiles do not: nothing there takes one).
+var draggable := true
 
 
 ## The tile for species `sp` (its pack built in `dir`) in `state` ("built" | "needs" | "unbuilt" | "missing"), drawn
@@ -98,6 +100,8 @@ static func badge_of(state: String) -> String:
 
 
 func _get_drag_data(_at: Vector2) -> Variant:
+	if not draggable:
+		return null
 	var pv := Label.new()
 	pv.text = tooltip_text
 	set_drag_preview(pv)

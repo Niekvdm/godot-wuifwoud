@@ -253,14 +253,19 @@ static func _card(t: Dictionary) -> Control:
 	return v
 
 
-## A resolved type's lanes as its card shows them, by its style: [key, title, entries] each (entries [[id, weight], …]).
+## A resolved type's lanes as its card shows them, by its style: [key, title, entries] each (entries [[id, weight], …]); a
+## band's dead trees after it, when it has any.
 static func card_lanes(t: Dictionary) -> Array:
 	var out := []
 	match String(t.get("style", "")):
 		"natural":
 			var b = t.get("bands", {})
+			var dd = t.get("dead", {})
 			for k in ["coast", "mid", "high"]:
 				out.append([k, String(k).capitalize(), (b as Dictionary).get(k, []) if b is Dictionary else []])
+				var dead: Array = (dd as Dictionary).get(k, []) if dd is Dictionary else []
+				if not dead.is_empty():
+					out.append(["dead_" + k, "Dead", dead])
 			out.append(["bush", "Bushes", t.get("bush", [])])
 		"bushes":
 			out.append(["bush", "Bushes", t.get("bush", [])])

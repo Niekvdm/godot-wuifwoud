@@ -34,7 +34,7 @@ static func _frames(n: int) -> void:
 ## The popover grid's tile names, in order.
 static func _names(pk) -> Array:
 	var g: Node = pk.find_child(String(pk.prefix) + "SpeciesGrid", true, false)
-	return g.get_children().map(func(c): return String(c.name)) if g != null else []
+	return g.get_children().filter(func(c): return (c as Control).visible).map(func(c): return String(c.name)) if g != null else []
 
 
 static func run() -> Dictionary:
@@ -93,6 +93,7 @@ static func run() -> Dictionary:
 		and not bush.has_theme_stylebox_override("normal"))
 	# ── the search ──
 	var field: LineEdit = pk.find_child("NewSpeciesSearch", true, false)
+	var bush_before: Node = pk.find_child("NewSpecies_W_Bush", true, false)
 	field.text_changed.emit("bu")
 	var by_id := _names(pk)
 	var sp_new: ForestSpecies = VA.species_of("W_New")
@@ -100,9 +101,10 @@ static func run() -> Dictionary:
 	pk.set_search("row")
 	var by_name := _names(pk)
 	sp_new.display_name = ""
-	_chk(r, "the search narrows by id or name; the grid alone is filled again, the field kept (%s; %s)" % [str(by_id), str(by_name)],
+	_chk(r, "the search narrows by id or name; the tiles are hidden, not rebuilt, the field kept (%s; %s)" % [str(by_id), str(by_name)],
 		by_id == ["NewSpeciesBy", "NewSpecies_W_Bush"] and by_name == ["NewSpeciesBy", "NewSpecies_W_New"]
-		and is_same(field, pk.find_child("NewSpeciesSearch", true, false)))
+		and is_same(field, pk.find_child("NewSpeciesSearch", true, false))
+		and is_same(bush_before, pk.find_child("NewSpecies_W_Bush", true, false)))
 	# ── a pick ──
 	var got := []
 	pk.picked.connect(func(id: String) -> void: got.append(id))
@@ -117,6 +119,14 @@ static func run() -> Dictionary:
 	await _frames(2)
 	_chk(r, "a tile's click lands once its input is done; By type picks \"\" (%s; at once %s)" % [str(got), str(at_once)],
 		at_once == ["W_Tree"] and got == ["W_Tree", "W_Bush", ""] and String(pk.current) == "")
+	pk.open()
+	var drag_tile := pk.find_child("NewSpecies_W_Tree", true, false) as Button
+	_chk(r, "a picker's tiles do not drag (nothing there takes a species)",
+		drag_tile != null and drag_tile._get_drag_data(Vector2.ZERO) == null)
+	(pk.find_child("NewSpeciesSearch", true, false) as LineEdit).text_submitted.emit("tre")
+	await _frames(2)
+	_chk(r, "Enter in the search picks the first species it shows (%s)" % str(got),
+		not got.is_empty() and got.back() == "W_Tree" and String(pk.current) == "W_Tree")
 	pk.free()
 	PicturesRes.forget()
 	VA.forget_packs()

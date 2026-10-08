@@ -81,7 +81,6 @@ static func run() -> Dictionary:
 	var fx := Fix.make(ROOT)
 	VA.use_packs([fx["fixture"], fx["other"]], PackedStringArray(["W_Other"]))
 	var caught := Caught.new()
-	OS.add_logger(caught)
 	var vp := SubViewport.new()
 	vp.size = Vector2i(1600, 1000)
 	vp.gui_embed_subwindows = true
@@ -115,6 +114,7 @@ static func run() -> Dictionary:
 		got == ["W_Tree"] and pop != null and not pop.visible and String(pk.text) == "W Tree ▾")
 	host.remove_child(face)
 	face.queue_free()
+	OS.add_logger(caught)
 	# ── an owner that rebuilds on a pick ──
 	var made := []
 	var hold := [Callable()]
@@ -145,6 +145,7 @@ static func run() -> Dictionary:
 	if p2 != null and t2 != null:
 		await _click(vp, _in_pop(p2, t2))
 	await _frames(2)
+	OS.remove_logger(caught)
 	_chk(r, "an owner that rebuilds on a pick: the new picker opens and picks again, and no engine error (%s; %s)" % [
 		str(got), str(caught.lines)],
 		got == ["W_Tree", "W_Bush", ""] and made.size() == 3 and String(made[-1].current) == ""
@@ -167,7 +168,6 @@ static func run() -> Dictionary:
 		and grid.get_child_count() == 61 and grid.size.y > sc.size.y)
 	if bp != null:
 		bp.hide()
-	OS.remove_logger(caught)
 	vp.queue_free()
 	await _frames(1)
 	PicturesRes.forget()

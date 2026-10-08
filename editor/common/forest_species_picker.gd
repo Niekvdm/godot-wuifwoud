@@ -4,7 +4,7 @@
 extends Button
 ## A compact species picker (the Tree and Row panel, the Import dialog's rule inspector): the species picked, its
 ## picture and name, or By type (the forest type picks); a click opens a popover under it, a grid of picture tiles with
-## a search and By type first. A tile clicked closes the popover and is `picked` (its id, "" for By type) once that
+## a search (Enter picks the first it shows) and By type first. A tile clicked closes the popover and is `picked` (its id, "" for By type) once that
 ## click's input is done, so an owner that rebuilds on a pick never takes the popover out of the tree under the mouse.
 ## A species that grows nowhere (switched off, or in no pack) or whose mesh is missing is red and says why; one picked
 ## already stays offered.
@@ -128,12 +128,9 @@ func shown_ids() -> PackedStringArray:
 	var ids := PackedStringArray(offered)
 	if current != "" and not ids.has(current):
 		ids.insert(0, current)
-	var q := search.strip_edges().to_lower()
-	if q == "":
-		return ids
 	var out := PackedStringArray()
 	for id in ids:
-		if String(id).to_lower().contains(q) or caption_of(String(id)).to_lower().contains(q):
+		if _matches(String(id)):
 			out.append(id)
 	return out
 
@@ -162,10 +159,29 @@ func choose(id: String) -> void:
 	picked.emit(id)
 
 
-## The search narrowed: the grid alone is filled again (the field keeps its focus and caret).
+## The search narrowed: the tiles it leaves out are hidden, none rebuilt (the field keeps its focus and caret).
 func set_search(t: String) -> void:
 	search = t
-	_fill()
+	if _grid == null:
+		return
+	for c in _grid.get_children():
+		if c.has_meta("species"):
+			(c as Control).visible = _matches(String(c.get_meta("species")))
+
+
+func _matches(id: String) -> bool:
+	var q := search.strip_edges().to_lower()
+	return q == "" or id.to_lower().contains(q) or caption_of(id).to_lower().contains(q)
+
+
+## Enter in the search: the first species it shows is picked (nothing for an empty search).
+func _on_submit(t: String) -> void:
+	set_search(t)
+	if search.strip_edges() == "":
+		return
+	var ids := shown_ids()
+	if not ids.is_empty():
+		_on_tile(String(ids[0]))
 
 
 ## The face: the species' picture and name, a ▾; red with why when it grows nowhere.
@@ -193,6 +209,7 @@ func _build_pop() -> void:
 	_search = kit.search_field("Search species")
 	_search.name = prefix + "SpeciesSearch"
 	_search.text_changed.connect(set_search)
+	_search.text_submitted.connect(_on_submit)
 	v.add_child(_search)
 	var sc := ScrollContainer.new()
 	sc.name = prefix + "SpeciesScroll"
@@ -227,6 +244,7 @@ func _tile(id: String) -> Button:
 	if sp != null:
 		var state := "built" if mesh_found(sp) else "missing"
 		t = SpeciesTileRes.new().setup(kit, sp, VA.built_dir_of(id), state, true, id == current, accent, TILE_PX)
+		t.draggable = false
 		if state == "missing":
 			t.tooltip_text = "%s (%s): %s" % [caption_of(id), id, why(id)]
 	else:
@@ -234,6 +252,7 @@ func _tile(id: String) -> Button:
 		kit.set_tile_selected(t, true)
 		t.tooltip_text = "%s (%s): %s" % [caption_of(id), id, why(id)]
 	t.name = prefix + "Species_" + id.validate_node_name()
+	t.set_meta("species", id)
 	t.pressed.connect(_on_tile.bind(id))
 	return t
 

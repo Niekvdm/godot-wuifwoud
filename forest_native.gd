@@ -83,8 +83,8 @@ static func warn_missing() -> void:
 	ForestLogRes.warn(missing_text(not force_absent and lib != "" and FileAccess.file_exists(lib)))
 
 
-## The library file this platform loads: the extension's entry whose feature tags (OS, build, CPU) all hold here; ""
-## when it names none.
+## The library file this platform loads: the first entry of the extension whose feature tags (OS, build, CPU) all hold
+## here; "" when none does.
 static func library_path() -> String:
 	var cf := ConfigFile.new()
 	if cf.load(GDEXTENSION) != OK or not cf.has_section("libraries"):
