@@ -17,6 +17,9 @@ const PackOf := preload("res://addons/wuifwoud/tests/fixtures/pack_of.gd")
 const ForestConfigRes := preload("res://addons/wuifwoud/forest_config.gd")
 const OldProviders := preload("res://addons/wuifwoud/tests/fixtures/old_providers.gd")
 const ImportRes := preload("res://addons/wuifwoud/forest_import.gd")
+const TypeTileRes := preload("res://addons/wuifwoud/editor/common/forest_type_tile.gd")
+const PicturesRes := preload("res://addons/wuifwoud/editor/common/forest_pictures.gd")
+const KitRes := preload("res://addons/wuifwoud/editor/common/forest_kit.gd")
 const PROVIDERS := "res://addons/terrain_3d_extended/src/tool_providers.gd"
 const PROFILE_PATH := "user://wf_b2a_paint_profile.json"
 const CAT := {
@@ -124,6 +127,41 @@ static func run() -> Dictionary:
 	var names: Array = (lib["items"] as Array).map(func(i): return i["name"])
 	_chk(r, "the library is the forest's types (%s; %s)" % [str(names), lib["footer"]],
 		names == ["Wood", "Orchard"] and String(lib["footer"]).begins_with("2 types"))
+	var items: Array = lib["items"]
+	var t1: Dictionary = vp._types.get_type(1)
+	var t2: Dictionary = vp._types.get_type(2)
+	_chk(r, "each library tile is its type's icon tile: a natural type of conifers wears the conifer, a grid the orchard",
+		items[0]["picture"] == TypeTileRes.texture("conifer", ProviderRes.colour_of(t1), ProviderRes.LIBRARY_PX)
+		and items[1]["picture"] == TypeTileRes.texture("orchard", ProviderRes.colour_of(t2), ProviderRes.LIBRARY_PX))
+	var wood: Control = (items[0]["card"] as Callable).call()
+	var orch: Control = (items[1]["card"] as Callable).call()
+	var w_icon := wood.find_child("Icon", true, false) as TextureRect
+	var o_icon := orch.find_child("Icon", true, false) as TextureRect
+	var w_title := wood.find_child("Title", true, false) as Label
+	var w_nums := wood.find_child("Numbers", true, false) as Label
+	var w_pic := wood.find_child("Pic_W_Old", true, false) as TextureRect
+	_chk(r, "a hover card: the type's icon, its name and style, its numbers, and each lane's heaviest species as pictures (%s)" % (w_title.text if w_title != null else "no title"),
+		w_icon != null and w_icon.get_meta("icon") == "conifer" and w_title != null and w_title.text == "Wood (1) · natural"
+		and w_nums != null and w_nums.text.contains("clump") and wood.find_child("Lane_coast", true, false) != null
+		and wood.find_child("Lane_high", true, false) != null and wood.find_child("Lane_bush", true, false) != null
+		and w_pic != null and w_pic.texture == PicturesRes.of_id("W_Old")
+		and o_icon != null and o_icon.get_meta("icon") == "orchard" and orch.find_child("Lane_grid", true, false) != null
+		and orch.find_child("Lane_mid", true, false) == null and orch.find_child("Pic_W_Plum", true, false) != null)
+	wood.free()
+	orch.free()
+	_chk(r, "a lane's heaviest species, each once, ties in their order",
+		ProviderRes.top_species([["W_A", 1.0], ["W_B", 3.0], ["W_C", 3.0], ["W_A", 2.5], "W_D"], 3)
+		== PackedStringArray(["W_A", "W_B", "W_C"]))
+	var bare: Control = ProviderRes._card({"id": 9, "name": "Bare", "style": "mix", "density": 0.01, "pitch": 10.0,
+		"clump": 0.0, "understory": 0.35, "edge_wall_m": 0.0, "edge_wall_mult": 1.0, "tree": [],
+		"bush": [["W_Gone", 1.0]]})
+	var gone := bare.find_child("Pic_W_Gone", true, false) as TextureRect
+	var b_icon := bare.find_child("Icon", true, false) as TextureRect
+	_chk(r, "a card with an empty lane says nothing grows there; a species no pack has shows the broadleaf glyph",
+		bare.find_child("Lane_trees", true, false) != null and bare.find_child("Nothing", true, false) != null
+		and gone != null and gone.texture == PicturesRes.glyph("broadleaf")
+		and b_icon != null and b_icon.get_meta("icon") == "mixed")
+	bare.free()
 
 	p.library_select(2)
 	p.activate("forest.paint", null)
@@ -173,6 +211,13 @@ static func run() -> Dictionary:
 	_chk(r, "Pick selects the type under the cursor, says what it picked, hands back (%s; %s)" % [p.picked, str(dones)],
 		p.library_selected() == 2 and p.picked.contains("Orchard") and p.picked.contains("painted")
 		and dones == ["forest.pick"])
+	var hb := VBoxContainer.new()
+	p.build_header(hb, KitRes.new(null), Color.WHITE)
+	var pick_icon := hb.find_child("Icon", true, false) as TextureRect
+	_chk(r, "Pick's readout carries the picked type's icon (%d)" % p.picked_type,
+		pick_icon != null and pick_icon.get_meta("icon") == "orchard" and p.picked_type == 2
+		and hb.find_child("Description", true, false) != null)
+	hb.free()
 	_chk(r, "the overlay's level: 2 or more here, 1 for an overlay without one",
 		(not ResourceLoader.exists(PROVIDERS) or ProviderRes.overlay_level(load(PROVIDERS)) >= 2)
 		and ProviderRes.overlay_level(OldProviders) == 1)

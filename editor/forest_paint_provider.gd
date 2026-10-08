@@ -4,11 +4,12 @@
 extends RefCounted
 ## The Forest workspace in Terrain3D Extended: a tool provider that paints itself (API v3, level 2). Its tools paint
 ## the edited scene's forest maps through ForestBrush (Paint, Ctrl: no forest; Replace; Density; Age; Smooth; Revert,
-## back to the import mapping) and Pick reads one texel. Every stroke is
-## one undo step in that scene's history; the touched cells grow again every REGROW_EVERY_MS during a stroke and at its
-## end. The plugin hands it the forest (`forest_of`) and the undo manager, and saves the maps with the scene. The ⋯
-## menu's Types…, Species… and Import… (and the library's footer: Types…) ask the plugin for those dialogs; while an
-## import runs no stroke starts (it would land in a map the import copied); a stroke from before an import no longer
+## back to the import mapping) and Pick reads one texel. The library shows each type as its icon tile and, hovered, its
+## card (its numbers and each lane's heaviest species as pictures); Pick's readout carries the picked type's icon. Every
+## stroke is one undo step in that scene's history; the touched cells grow again every REGROW_EVERY_MS during a stroke
+## and at its end. The plugin hands it the forest (`forest_of`) and the undo manager, and saves the maps with the scene.
+## The ⋯ menu's Types…, Species… and Import… (and the library's footer: Types…) ask the plugin for those dialogs; while
+## an import runs no stroke starts (it would land in a map the import copied); a stroke from before an import no longer
 ## undoes. Tree and Row place single trees and rows: their strokes, hover, cursor note and panel go to ForestPlaceTools
 ## (forest_place_tools.gd).
 
@@ -33,6 +34,18 @@ const ForestLogRes := preload("res://addons/wuifwoud/forest_log.gd")
 const PlaceRes := preload("res://addons/wuifwoud/editor/forest_place_tools.gd")
 ## The type icons and colours.
 const TypeTileRes := preload("res://addons/wuifwoud/editor/common/forest_type_tile.gd")
+## The species pictures.
+const PicturesRes := preload("res://addons/wuifwoud/editor/common/forest_pictures.gd")
+## A library tile's picture (px).
+const LIBRARY_PX := 64
+## A hover card's icon (px).
+const CARD_ICON_PX := 40
+## A hover card's species pictures (px).
+const CARD_PIC_PX := 36
+## The species a hover card shows a lane at most.
+const CARD_TOP := 4
+## Pick's icon in the panel's header (px).
+const PICK_ICON_PX := 20
 ## The Revert brush's cursor note asks for the mapping and the reader at most this often.
 const REVERT_ASK_MS := 1000
 ## A cursor note older than this (ms) is dropped.
@@ -84,6 +97,8 @@ var selected := 0
 var replace_from := 0
 ## The last Pick's readout (the panel's header row)
 var picked := ""
+## The last Pick's type (0: none, or no forest there).
+var picked_type := 0
 var _undo: Object = null
 var _invert := false       # Ctrl at the last brush_data() call, for the decal
 var _brush = ForestBrushRes.new()
@@ -193,7 +208,7 @@ func _overlay_has_us() -> bool:
 	return ov.active_provider() == self
 
 
-## The library: the profile's types in its order, each in its colour (the overlay's tool API). Its footer opens the
+## The library: the profile's types in its order, each its icon tile (the overlay's tool API). Its footer opens the
 ## Types dialog.
 func library() -> Dictionary:
 	var f := _forest()
@@ -202,23 +217,118 @@ func library() -> Dictionary:
 	if f != null:
 		for id in f._types.order():
 			var t: Dictionary = f._types.get_type(id)
-			items.append({"id": id, "name": String(t["name"]), "picture": _swatch(colour_of(t)), "card": _card.bind(t)})
+			items.append({"id": id, "name": String(t["name"]),
+				"picture": TypeTileRes.texture(TypeTileRes.icon_for(t), colour_of(t), LIBRARY_PX), "card": _card.bind(t)})
 		footer = "%d types · %s" % [items.size(), String(f.profile_path).get_file()]
 	return {"id": "types", "key": "forest.types", "placeholder": "Search types", "tool": "forest.paint",
 		"items": items, "footer": footer, "footer_action": "types"}
 
 
-## A type's hover card: its style, density, clump and understory, and its road edge wall.
+## A type's hover card: its icon, name and style; its density, clump and understory, its road edge wall; and each of
+## its lanes with the pictures of its CARD_TOP heaviest species.
 static func _card(t: Dictionary) -> Control:
-	var lines := PackedStringArray(["%s (%d) · %s" % [t["name"], t["id"], t["style"]],
-		"%.4f a m² (one every %.1f m)" % [float(t["density"]), float(t["pitch"])]])
+	var v := VBoxContainer.new()
+	v.name = "Card"
+	v.add_theme_constant_override("separation", 6)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 8)
+	head.add_child(TypeTileRes.tile(TypeTileRes.icon_for(t), colour_of(t), CARD_ICON_PX))
+	var title := Label.new()
+	title.name = "Title"
+	title.text = "%s (%d) · %s" % [t["name"], t["id"], t["style"]]
+	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(title)
+	v.add_child(head)
+	var lines := PackedStringArray(["%.4f a m² (one every %.1f m)" % [float(t["density"]), float(t["pitch"])]])
 	if String(t["style"]) == "natural":
 		lines.append("clump %.2f · understory %.2f" % [float(t["clump"]), float(t["understory"])])
 	if float(t["edge_wall_m"]) > 0.0 and float(t["edge_wall_mult"]) > 1.0:
 		lines.append("road edge wall %.0f m ×%.1f" % [float(t["edge_wall_m"]), float(t["edge_wall_mult"])])
+	var nums := Label.new()
+	nums.name = "Numbers"
+	nums.text = "\n".join(lines)
+	v.add_child(nums)
+	for lane in card_lanes(t):
+		v.add_child(_card_lane(String(lane[0]), String(lane[1]), lane[2]))
+	return v
+
+
+## A resolved type's lanes as its card shows them, by its style: [key, title, entries] each (entries [[id, weight], …]).
+static func card_lanes(t: Dictionary) -> Array:
+	var out := []
+	match String(t.get("style", "")):
+		"natural":
+			var b = t.get("bands", {})
+			for k in ["coast", "mid", "high"]:
+				out.append([k, String(k).capitalize(), (b as Dictionary).get(k, []) if b is Dictionary else []])
+			out.append(["bush", "Bushes", t.get("bush", [])])
+		"bushes":
+			out.append(["bush", "Bushes", t.get("bush", [])])
+		"grid":
+			out.append(["grid", "Grid", t.get("pool", [])])
+		"mix":
+			out.append(["trees", "Trees", t.get("tree", [])])
+			out.append(["bush", "Bushes", t.get("bush", [])])
+	return out
+
+
+## The `n` heaviest species of a lane's entries ([[id, weight], …] or [id, …]; an id twice adds its weights), heaviest
+## first, ties in their order, each once.
+static func top_species(entries: Array, n: int) -> PackedStringArray:
+	var w := {}
+	var order: Array = []
+	for e in entries:
+		var id: String = str(e[0]) if typeof(e) == TYPE_ARRAY else str(e)
+		var x: float = float(e[1]) if typeof(e) == TYPE_ARRAY and (e as Array).size() > 1 else 1.0
+		if not w.has(id):
+			order.append(id)
+			w[id] = 0.0
+		w[id] = float(w[id]) + x
+	var idx: Array = range(order.size())
+	idx.sort_custom(func(a: int, b: int) -> bool:
+		var wa: float = w[order[a]]
+		var wb: float = w[order[b]]
+		return wa > wb if wa != wb else a < b)
+	var out := PackedStringArray()
+	for i in idx:
+		if out.size() >= n:
+			break
+		out.append(String(order[i]))
+	return out
+
+
+## One lane on a card: its title, its heaviest species' pictures, "+N" for the rest, "nothing" when it grows none.
+static func _card_lane(key: String, title: String, entries: Array) -> Control:
+	var row := HBoxContainer.new()
+	row.name = "Lane_" + key
+	row.add_theme_constant_override("separation", 4)
 	var l := Label.new()
-	l.text = "\n".join(lines)
-	return l
+	l.text = title
+	l.custom_minimum_size.x = 56.0
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(l)
+	var all := top_species(entries, entries.size())
+	if all.is_empty():
+		var none := Label.new()
+		none.name = "Nothing"
+		none.text = "nothing"
+		none.modulate = Color(1.0, 1.0, 1.0, 0.55)
+		row.add_child(none)
+	for i in mini(all.size(), CARD_TOP):
+		var pic := TextureRect.new()
+		pic.name = "Pic_" + String(all[i]).validate_node_name()
+		pic.texture = PicturesRes.of_id(String(all[i]))
+		pic.custom_minimum_size = Vector2(CARD_PIC_PX, CARD_PIC_PX)
+		pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		row.add_child(pic)
+	if all.size() > CARD_TOP:
+		var more := Label.new()
+		more.name = "More"
+		more.text = "+%d" % (all.size() - CARD_TOP)
+		more.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(more)
+	return row
 
 
 ## The selected type.
@@ -247,10 +357,23 @@ func build_settings(box: VBoxContainer, p_tool: String, kit: Object, accent: Col
 		place.build_panel(box, p_tool, kit, accent)
 
 
-## The last Pick's readout, under the panel's header.
+## The last Pick's readout, under the panel's header: the picked type's icon and what it read.
 func build_header(box: VBoxContainer, kit: Object, _accent: Color) -> void:
-	if picked != "":
-		box.add_child(kit.description(picked))
+	if picked == "":
+		return
+	var row := HBoxContainer.new()
+	row.name = "Picked"
+	row.add_theme_constant_override("separation", 6)
+	var f := _forest()
+	var t: Dictionary = f._types.get_type(picked_type) if f != null and picked_type > 0 else {}
+	if not t.is_empty():
+		var ic := TypeTileRes.tile(TypeTileRes.icon_for(t), colour_of(t), PICK_ICON_PX)
+		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(ic)
+	var l: Label = kit.description(picked)
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(l)
+	box.add_child(row)
 
 
 ## The ⋯ menu's actions.
@@ -491,6 +614,7 @@ func _blit(f: Node, gen: int, loc: Vector2i, at: Vector2i, crop: Image) -> void:
 
 func _pick(f: Node, p_hit: Vector3) -> void:
 	var px: PackedInt32Array = f.maps.pixel_at(p_hit.x, p_hit.z)
+	picked_type = 0
 	if px.is_empty():
 		picked = "Picked: no forest map here"
 		return
@@ -500,12 +624,6 @@ func _pick(f: Node, p_hit: Vector3) -> void:
 		nm = String(t.get("name", "type %d (not in the profile)" % px[0]))
 		if not t.is_empty():
 			selected = px[0]
+			picked_type = px[0]
 	picked = "Picked: %s · density %d %% · age %+.2f · %s" % [nm, roundi(float(px[1]) * 100.0 / 255.0),
 		clampf(float(px[2] - 128) / 127.0, -1.0, 1.0), "painted" if px[3] == 255 else "as imported"]
-
-
-## A plain colour tile.
-static func _swatch(c: Color) -> Texture2D:
-	var img := Image.create_empty(8, 8, false, Image.FORMAT_RGB8)
-	img.fill(c)
-	return ImageTexture.create_from_image(img)

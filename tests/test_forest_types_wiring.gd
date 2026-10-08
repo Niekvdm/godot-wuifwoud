@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: MIT
 extends RefCounted
 ## The Types dialog in the editor: Forest → Types… (after Species…) asks the plugin for it; the workspace's ⋯ has Types…
-## first and no Reload types; the library lists the forest's types in the profile's order, each in its own colour, and its
-## footer opens the Types dialog; the brush wears the selected type's colour; color_of stays today's colour for an id.
+## first and no Reload types; the library lists the forest's types in the profile's order, each its icon tile in its own
+## colour, and its footer opens the Types dialog; the brush wears the selected type's colour; color_of stays today's
+## colour for an id.
 ##
 ## Run with a unit-suite runner: static run() returns {name, passed, failed, details}.
 
@@ -64,10 +65,11 @@ static func run() -> Dictionary:
 	var lib: Dictionary = p.library()
 	var items: Array = lib["items"]
 	var names: Array = items.map(func(i): return i["name"])
-	var c0: Color = (items[0]["picture"] as Texture2D).get_image().get_pixel(0, 0)
-	var c1: Color = (items[1]["picture"] as Texture2D).get_image().get_pixel(0, 0)
-	_chk(r, "the library: the profile's order, each type's colour, the footer opens the Types dialog (%s)" % str(names),
+	var c0: Color = (items[0]["picture"] as Texture2D).get_image().get_pixel(32, 2)
+	var c1: Color = (items[1]["picture"] as Texture2D).get_image().get_pixel(32, 2)
+	_chk(r, "the library: the profile's order, each type's icon tile in its colour, the footer opens the Types dialog (%s)" % str(names),
 		names == ["Heath", "Scrub"] and _near(c0, Color("aa3300")) and _near(c1, ProviderRes.color_of(2))
+		and items[0]["picture"] == TypeTileRes.texture("bush", Color.html("#aa3300"), ProviderRes.LIBRARY_PX)
 		and lib["footer_action"] == "types")
 	p.library_select(4)
 	p.activate("forest.paint", null)
