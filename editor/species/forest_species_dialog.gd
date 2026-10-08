@@ -436,6 +436,91 @@ func _write(before: Dictionary, after: Dictionary) -> String:
 
 # --- what the tree and the panel ask ---
 
+## The tile menu: Enable / Disable.
+const TILE_TOGGLE := 0
+## The tile menu: Build.
+const TILE_BUILD := 1
+## The tile menu: Remove from pack.
+const TILE_REMOVE := 2
+## The tile menu: Show in FileSystem.
+const TILE_SHOW := 3
+
+var _tile_menu: PopupMenu = null
+
+
+## What uses species `id` in the scene's forest.
+func uses_of(id: String) -> PackedStringArray:
+	var u = uses.call() if uses.is_valid() else {}
+	return (u as Dictionary).get(id, PackedStringArray()) if u is Dictionary else PackedStringArray()
+
+
+## Switch species `id` (every pack's row of it) on or off. Off while something uses it asks first, naming what loses it.
+func set_species_enabled(id: String, on: bool, confirmed := false) -> void:
+	var users := uses_of(id)
+	if not on and not confirmed and not users.is_empty():
+		asking = {"text": "%s is used by %s: those lose it (the rest of each mix share its weight; a single tree pinned to it grows its type's pick)." % [id, "; ".join(users)],
+			"action": "Disable", "do": set_species_enabled.bind(id, false, true)}
+		rebuild()
+		return
+	asking = {}
+	change(func() -> String:
+		var ds := config.disabled_species
+		if on:
+			while ds.has(id):
+				ds.remove_at(ds.find(id))
+		elif not ds.has(id):
+			ds.append(id)
+		config.disabled_species = ds
+		return "")
+
+
+## The question's action.
+func confirm_question() -> void:
+	var f: Callable = asking.get("do", Callable())
+	asking = {}
+	if f.is_valid():
+		f.call()
+	else:
+		rebuild()
+
+
+## The question answered no.
+func cancel_question() -> void:
+	asking = {}
+	rebuild()
+
+
+## The tile menu of species `id` at screen position `at`.
+func open_tile_menu(id: String, at: Vector2) -> void:
+	if _tile_menu != null and is_instance_valid(_tile_menu):
+		_tile_menu.queue_free()
+	var row := row_of(id)
+	if row.is_empty():
+		return
+	_tile_menu = PopupMenu.new()
+	_tile_menu.add_item("Disable" if not config.disabled_species.has(id) else "Enable", TILE_TOGGLE)
+	_tile_menu.add_item("Build", TILE_BUILD)
+	_tile_menu.set_item_disabled(_tile_menu.item_count - 1, busy() or String(row["state"]) == "missing")
+	_tile_menu.add_item("Show in FileSystem", TILE_SHOW)
+	_tile_menu.id_pressed.connect(func(item: int) -> void: tile_menu_action(id, item))
+	add_child(_tile_menu)
+	_tile_menu.popup(Rect2i(Vector2i(at), Vector2i.ZERO))
+
+
+## A tile menu item picked for species `id`.
+func tile_menu_action(id: String, item: int) -> void:
+	match item:
+		TILE_TOGGLE:
+			set_species_enabled(id, config.disabled_species.has(id))
+		TILE_BUILD:
+			build_species(id)
+		TILE_SHOW:
+			var row := row_of(id)
+			if not row.is_empty() and show_file.is_valid():
+				show_file.call(String(row["s"].resource_path) if String(row["s"].resource_path) != ""
+					else String(row["pack"].resource_path))
+
+
 ## Select species `id`.
 func select(id: String) -> void:
 	selected = id

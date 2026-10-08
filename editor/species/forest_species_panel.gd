@@ -44,9 +44,31 @@ static func build(d) -> Control:
 	b.disabled = d.busy() or String(row["state"]) == "missing" or String(row["dir"]) == ""
 	b.pressed.connect(d.build_species.bind(String(sp.id)))
 	head.add_child(b)
+	var on := CheckButton.new()
+	on.name = "Enabled"
+	on.button_pressed = not d.config.disabled_species.has(String(sp.id))
+	on.focus_mode = Control.FOCUS_NONE
+	on.tooltip_text = "Grow this species"
+	on.toggled.connect(func(t: bool) -> void: d.set_species_enabled(String(sp.id), t))
+	head.add_child(on)
 	v.add_child(head)
+	if not d.asking.is_empty():
+		var q: PanelContainer = d.kit.banner(String(d.asking["text"]), String(d.asking.get("action", "")), d.ERROR)
+		q.name = "Question"
+		(q.find_child("Action", true, false) as Button).pressed.connect(d.confirm_question)
+		var keep: Button = d.kit.chip("Keep it", false, d.accent)
+		keep.name = "KeepIt"
+		keep.pressed.connect(d.cancel_question)
+		q.get_child(0).add_child(keep)
+		v.add_child(q)
 	if not bool(row["enabled"]):
 		v.add_child(d.hint("Its pack is switched off: it grows nowhere."))
+	var used: PackedStringArray = d.uses_of(String(sp.id))
+	v.add_child(d.kit.section("Used by"))
+	var ul: Label = d.hint("\n".join(used) if not used.is_empty() else
+		("Switched off: it grows nowhere." if d.config.disabled_species.has(String(sp.id)) else "Nothing in this scene's forest."))
+	ul.name = "UsedBy"
+	v.add_child(ul)
 	return v
 
 

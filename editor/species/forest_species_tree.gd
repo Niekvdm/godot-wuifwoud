@@ -113,6 +113,7 @@ static func _pack_row(d, pr: Dictionary, shown: Array, narrowing: bool) -> Contr
 				id == d.selected, d.accent)
 			t.pressed.connect(d.select.bind(id))
 			t.activated.connect(d.select.bind(id))
+			t.menu_requested.connect(func(at: Vector2) -> void: d.open_tile_menu(id, at))
 			flow.add_child(t)
 		v.add_child(flow)
 	return box
