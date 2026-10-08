@@ -26,6 +26,8 @@ const PanelRes := preload("res://addons/wuifwoud/editor/species/forest_species_p
 const PicturesRes := preload("res://addons/wuifwoud/editor/common/forest_pictures.gd")
 ## The 3D view.
 const ViewRes := preload("res://addons/wuifwoud/editor/species/forest_species_view.gd")
+## The forest's assets (the hand-over band).
+const VA := preload("res://addons/wuifwoud/forest_assets.gd")
 ## Add species.
 const AddRes := preload("res://addons/wuifwoud/editor/species/forest_species_add.gd")
 ## The mesh files a species takes.
@@ -618,6 +620,27 @@ func remove_from_pack(id: String, pack) -> void:
 		pack.species = arr
 		note = "%s is out of %s; its file %s stays." % [id, pack_label(pack), String(sp.resource_path)]
 		return "")
+
+
+## The view at the dialog's width (on), or back to the tree (off).
+func inspect(on: bool) -> void:
+	inspecting = on and selected != ""
+	if not inspecting and view != null and not ["model", "card"].has(view.mode):
+		view.set_mode("model")
+	rebuild()
+
+
+## A tile's double click: select it and inspect it.
+func inspect_species(id: String) -> void:
+	selected = id
+	inspect(true)
+
+
+## Species `id`'s mesh-to-card hand-over: the plugin's (the scene's forest's settings), else the defaults.
+func handover_for(id: String) -> Dictionary:
+	if handover_of.is_valid():
+		return handover_of.call(id)
+	return VA.handover_band(300.0, 90.0)
 
 
 ## Select species `id`.

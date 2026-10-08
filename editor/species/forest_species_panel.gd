@@ -121,16 +121,19 @@ static func _view_block(d, sp) -> Control:
 	vb.name = "ViewBlock"
 	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var view: Control = d.view_for_selected()
-	view.custom_minimum_size.y = 190.0
+	vb.size_flags_stretch_ratio = 2.1 if d.inspecting else 1.0
+	view.custom_minimum_size.y = 420.0 if d.inspecting else 190.0
+	for c in view.camera_moved.get_connections():
+		view.camera_moved.disconnect(c["callable"])       # the kept view must not pile up a rebuild's readouts
 	view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vb.add_child(view)
 	var bar := HBoxContainer.new()
 	bar.name = "ViewBar"
-	var modes := ["model", "card"]
-	var seg: HBoxContainer = d.kit.segmented(["Model", "Card"], maxi(modes.find(view.mode), 0), d.accent,
-		func(i: int) -> void:
-			view.set_mode(modes[i])
-			d.rebuild())
+	var modes: Array = ["model", "card", "compare", "sheets"] if d.inspecting else ["model", "card"]
+	var labels: Array = ["Model", "Card", "Compare", "Sheets"] if d.inspecting else ["Model", "Card"]
+	var seg: HBoxContainer = d.kit.segmented(labels, maxi(modes.find(view.mode), 0), d.accent, func(i: int) -> void:
+		view.set_mode(modes[i])
+		d.rebuild())
 	seg.name = "Modes"
 	bar.add_child(seg)
 	if view.levels().size() > 1:
@@ -148,7 +151,28 @@ static func _view_block(d, sp) -> Control:
 	tl.modulate = d.DIM
 	tl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.add_child(tl)
+	var ins: Button = d.kit.chip("⤡ Back to the list" if d.inspecting else "⤢ Inspect", false, d.accent)
+	ins.name = "Inspect"
+	ins.pressed.connect(d.inspect.bind(not d.inspecting))
+	bar.add_child(ins)
 	vb.add_child(bar)
+	if d.inspecting and (view.mode == "compare" or view.mode == "card"):
+		var band: Dictionary = d.handover_for(String(sp.id))
+		var out1 := float(band.get("out1", 300.0))
+		var drow: VBoxContainer = d.kit.slider_row("Distance", 2.0, out1 * 1.4, 1.0, view.distance(), "m", d.accent)
+		drow.name = "Distance"
+		var ro := Label.new()
+		ro.name = "Readout"
+		var say := func() -> void:
+			ro.text = "%d m · hand-over %d m · elev %d°" % [roundi(view.distance()), roundi(out1), roundi(view.elevation_deg())]
+		say.call()
+		(drow.get_node("Slider") as HSlider).value_changed.connect(func(x: float) -> void:
+			view.dist = x
+			view._aim()
+			say.call())
+		view.camera_moved.connect(say)
+		vb.add_child(drow)
+		vb.add_child(ro)
 	return vb
 
 
