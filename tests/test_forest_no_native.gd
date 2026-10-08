@@ -3,8 +3,8 @@
 extends RefCounted
 ## The forest without its native core (a fresh clone that has not built the library, a platform it
 ## is not built for): a ring cell is registered empty at once and no job runs; the far forest starts nothing; one warning
-## says why and where the library comes from; the maps still read, paint and save (no block grows anything); with the
-## core back, the forest grows again.
+## says why (not built, or built but not loaded) and where the library comes from; the maps still read, paint and save
+## (no block grows anything); with the core back, the forest grows again.
 ##
 ## Run with a unit-suite runner: static run() returns {name, passed, failed, details}.
 
@@ -119,4 +119,15 @@ static func run() -> Dictionary:
 				wrong.append("%s.%s" % [p[0], t])
 	_chk(r, "the extension names the library for Linux, Windows and macOS (wrong or missing: %s)" % str(wrong),
 		ext_ok and wrong.is_empty())
+	var lib: String = NativeRes.library_path()
+	_chk(r, "the library this platform loads, by the extension's feature tags (%s)" % lib,
+		lib.begins_with("res://addons/wuifwoud/bin/libwuifwoud_core.")
+		and lib.contains("template_debug" if OS.has_feature("debug") else "template_release"))
+	_chk(r, "a library on disk that did not load is told apart from one not built; each says where it comes from",
+		NativeRes.missing_text(true).contains("did not load") and NativeRes.missing_text(false).contains("is not built")
+		and NativeRes.missing_text(true).contains("addons/wuifwoud/native")
+		and NativeRes.missing_text(false).contains("addons/wuifwoud/native"))
+	_chk(r, "the extension asks for Godot 4.8, the version its library is built against (%s)" % str(
+		ext.get_value("configuration", "compatibility_minimum", "")),
+		str(ext.get_value("configuration", "compatibility_minimum", "")) == "4.8")
 	return r

@@ -20,7 +20,8 @@ const SET_FILE := "wuifwoud_packs.tres"
 ## Feeder scripts (ForestFeeder) added under every ForestSpawner in the game, one node per script.
 @export var runtime_inputs: Array[Script] = []
 
-## Feeders that also run in the editor. Empty until the forest has an editor preview.
+## Feeder scripts added under every ForestSpawner in the editor, in place of runtime_inputs (@tool scripts only): what
+## moves the forest that grows around the editor's camera.
 @export var editor_inputs: Array[Script] = []
 
 @export_group("Species packs")

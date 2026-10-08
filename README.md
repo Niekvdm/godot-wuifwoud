@@ -12,7 +12,9 @@ A streamed forest for [Terrain3D](https://github.com/TokisanGames/Terrain3D) in 
 - An **import** from GeoJSON, an **Import dialog** and **paint tools** in the editor (with Terrain3D Extended).
 - **Species packs** built offline, and a CC0 **starter pack** of nine species that grows out of the box.
 - Trunk colliders around moving bodies, wind, gusts and vehicle push.
-- The same forest on every peer of a multiplayer game, with nothing synced.
+- The same forest on every peer of a multiplayer game, with nothing synced: which tree grows where, of which species,
+  is decided from integer hashes, the same on any machine; a tree's turn and lean go through the platform's sine and
+  cosine, which may round differently from one platform to another.
 
 ## Requirements
 

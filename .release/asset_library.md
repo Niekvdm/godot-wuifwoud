@@ -20,8 +20,8 @@ Paste these into the Godot Asset Library's submission form (https://godotengine.
 A streamed forest for Terrain3D: woods grown from forest maps you import and paint, mesh trees with their authored LOD
 chains near the camera, baked impostor cards past them and a canopy far field to the horizon, single trees and tree
 rows, trunk colliders around whatever moves, and wind. The forest grows in a ring around the camera on worker threads,
-by a native library, and every tree is decided from integer hashes, so every peer of a multiplayer game grows the same
-forest. Species come in packs built offline; a CC0 starter pack is included. Paint it with Terrain3D Extended.
+by a native library, and which tree grows where is decided from integer hashes, so every peer of a multiplayer game
+grows the same forest (a tree's turn may round differently from one platform to another). Species come in packs built offline; a CC0 starter pack is included. Paint it with Terrain3D Extended.
 
 Requires Terrain3D and the Forward+ renderer. The native library ships for Linux x86_64 in 1.0.0; Windows and macOS
 follow.

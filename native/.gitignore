@@ -5,3 +5,8 @@ bin/
 .sconsign.dblite
 .sconf_temp/
 godot-cpp
+# MSVC build products.
+*.obj
+*.lib
+*.exp
+*.pdb

@@ -90,11 +90,11 @@ static func run() -> Dictionary:
 	_chk(r, "a built picture once forgotten and asked again", pic != null and pic.get_width() == 256 and PicturesRes.has_picture(oak, ROOT))
 
 	# ── the tile ──
-	var t = TileRes.new().setup(k, _sp("W_Fir_06", "tree", "conifer"), "", "needs", true, true, ACC)
+	var t = TileRes.new().setup(k, _sp("W_Fir", "tree", "conifer"), "", "needs", true, true, ACC)
 	_chk(r, "a tile: its caption, its badge, a green dot",
-		(t.get_node("Name") as Label).text == "W Fir 06" and (t.get_node("Badge") as Label).text == "build"
+		(t.get_node("Name") as Label).text == "W Fir" and (t.get_node("Badge") as Label).text == "build"
 		and ((t.get_node("Dot") as Panel).get_theme_stylebox("panel") as StyleBoxFlat).bg_color == TileRes.ON)
-	_chk(r, "a tile drags its id", t._get_drag_data(Vector2.ZERO) == {"kind": TileRes.KIND, "id": "W_Fir_06"})
+	_chk(r, "a tile drags its id", t._get_drag_data(Vector2.ZERO) == {"kind": TileRes.KIND, "id": "W_Fir"})
 	var acts := [0]
 	t.activated.connect(func() -> void: acts[0] += 1)
 	var dbl := InputEventMouseButton.new()

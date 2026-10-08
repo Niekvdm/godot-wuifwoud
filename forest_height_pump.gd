@@ -24,9 +24,9 @@ var _wanted := {}        # Vector2i -> true, region in flight
 ## else would bound every consumer of this pump by the RENDERER's residency: measured
 ## on one island, 8 of 1024 regions are resident (~1536 m around the player) against a
 ## 2800 m impostor ring, so the forest's far field could not be placed at all; and,
-## worse, `ForestSpawner._regions_ready` only waits for regions that read `pending`,
-## so a declined region never blocks, and the cell is placed with NAN over it and then
-## marked done forever.
+## worse, `ForestSpawner._regions_ready` waits only for regions that read `pending` (and a
+## cell's centre region unless it is off the map), so a declined region elsewhere in the cell
+## never blocks, and the cell is placed with NAN over it and then marked done forever.
 ##
 ## The region files are on disk whatever the renderer is holding. Measured cost of
 ## loading one standalone: **5.3 ms** (512², FORMAT_RF), and the float conversion on a

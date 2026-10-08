@@ -11,7 +11,8 @@ extends RefCounted
 ## that reached it would break. So no script names a native class: the core is made here with ClassDB.instantiate and
 ## held untyped, its methods called on the instance; its tables, road corridor and arenas come from its own methods.
 ##
-## WITHOUT THE LIBRARY the forest grows nothing, near or far, and says so once; the game runs. A LIBRARY OF
+## WITHOUT THE LIBRARY the forest grows nothing, near or far, and says so once (not built, or built but not loaded);
+## the game runs. A LIBRARY OF
 ## ANOTHER VERSION (built before these scripts, or an editor still holding the old one) counts as none and says so once:
 ## rebuild it, then restart the editor; it would otherwise fail job by job on the methods it lacks.
 
@@ -21,6 +22,8 @@ const ForestLogRes := preload("res://addons/wuifwoud/forest_log.gd")
 const CLASS := &"WfCore"
 ## The library these scripts are written against: what WfCore.version() says.
 const VERSION := "wuifwoud_core 3"
+## The extension file naming the library a platform loads.
+const GDEXTENSION := "res://addons/wuifwoud/wuifwoud_core.gdextension"
 ## Tests: behave as if the library were not built.
 static var force_absent := false
 ## Tests: the version asked for (anything else counts as stale); reprobe() after changing it.
@@ -76,6 +79,35 @@ static func warn_missing() -> void:
 			+ "need '%s'), so no forest grows, near or far. Rebuild it from addons/wuifwoud/native (the addon's README "
 			+ "says how), then restart the editor.") % [_found, expect_version])
 		return
-	ForestLogRes.warn(("[Wuifwoud] the forest's native core (the wuifwoud_core library, class %s) is not built, so no "
-		+ "forest grows, near or far. Build it from addons/wuifwoud/native (the addon's README says how), then restart "
-		+ "the editor, or run a headless --import once.") % CLASS)
+	var lib := library_path()
+	ForestLogRes.warn(missing_text(not force_absent and lib != "" and FileAccess.file_exists(lib)))
+
+
+## The library file this platform loads: the extension's entry whose feature tags (OS, build, CPU) all hold here; ""
+## when it names none.
+static func library_path() -> String:
+	var cf := ConfigFile.new()
+	if cf.load(GDEXTENSION) != OK or not cf.has_section("libraries"):
+		return ""
+	for key in cf.get_section_keys("libraries"):
+		var all := true
+		for tag in String(key).split("."):
+			if not OS.has_feature(tag):
+				all = false
+				break
+		if all:
+			return str(cf.get_value("libraries", key))
+	return ""
+
+
+## What the warning says when the core is missing: `file_there`, its library is on disk but did not load; else it is
+## not built. Both say where it comes from.
+static func missing_text(file_there: bool) -> String:
+	if file_there:
+		return ("[Wuifwoud] the forest's native core (%s) is there but did not load, so no forest grows, near or far. "
+			+ "An editor that was open when it was built loads it after a restart; otherwise the error loading it, above "
+			+ "in the Output, says why (built for a newer system, or for another Godot): rebuild it from "
+			+ "addons/wuifwoud/native (the addon's README says how).") % library_path().get_file()
+	return ("[Wuifwoud] the forest's native core (the wuifwoud_core library, class %s) is not built, so no forest grows, "
+		+ "near or far. Build it from addons/wuifwoud/native (the addon's README says how), then restart the editor, or "
+		+ "run a headless --import once.") % CLASS
