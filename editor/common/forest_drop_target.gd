@@ -60,7 +60,7 @@ func _gui_input(ev: InputEvent) -> void:
 		pressed.emit()
 		accept_event()
 	elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
-		menu_requested.emit(get_global_mouse_position())
+		menu_requested.emit(get_screen_transform() * mb.position)
 		accept_event()
 
 

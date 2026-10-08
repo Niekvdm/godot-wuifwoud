@@ -5,7 +5,8 @@ extends Button
 ## A species tile in the Species dialog: its picture (ForestPictures), its name along the bottom, a dot at the top right
 ## (green: it grows; hollow: switched off, the tile dimmed), a badge at the top left ("build", amber: not built or out
 ## of date; "mesh missing", red), a bush's corner fold at the bottom right, and the accent frame when selected. Dragging
-## it carries {"kind": KIND, "id"}; a click is `pressed`, a double click `activated`, a right click `menu_requested`.
+## it carries {"kind": KIND, "id"}; a click is `pressed`, a double click `activated`, a right click `menu_requested`
+## (at the mouse on the screen: where a popup opens).
 
 ## A double click.
 signal activated
@@ -111,5 +112,5 @@ func _gui_input(ev: InputEvent) -> void:
 		activated.emit()
 		accept_event()
 	elif mb.button_index == MOUSE_BUTTON_RIGHT:
-		menu_requested.emit(get_global_mouse_position())
+		menu_requested.emit(get_screen_transform() * mb.position)
 		accept_event()
