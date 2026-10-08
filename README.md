@@ -163,11 +163,16 @@ With the plugin enabled, the forest grows around the editor camera.
   | Tree | Click places a single tree, drag moves it, Ctrl deletes it. |
   | Row | Drag draws a row; drag a vertex to move it, the line to add one; Shift moves the row; Ctrl deletes. |
 
+- **The library** shows each type as its icon on its colour (both set in *Types…*); hover a type for its card: its
+  style and numbers, and the heaviest species of each lane as pictures. *Pick*'s readout carries the picked type's icon.
+- **The Tree and Row panel:** its type chips carry the icons, and the species is one picker, its picture and name:
+  click it for a grid of pictures with a search and *By type* first (the type picks). It offers every species the packs
+  grow.
 - **Saving:** painted maps and `trees.json` are saved with the scene (Ctrl+S); each stroke or gesture is one undo step.
 - **Import…** (the workspace's ⋯ menu) opens the Import dialog for the open scene. Its mapping lives at
   `<ForestConfig.imports_dir>/<scene name>.json`:
-  - **Rules:** drag property values onto rules; order the rules; set each rule's type, density, age, and for points
-    and lines its spacing, clearance and species.
+  - **Rules:** drag property values onto rules (each row wears its type's icon); order the rules; set each rule's type,
+    density, age, and for points and lines its spacing, clearance and species (the Tree and Row panel's picker).
   - **Source:** the GeoJSON files, the terrain folder, the texel size and the exclusion files.
   - **Run** imports on a worker thread, with progress and Cancel; the forest regrows when it finishes.
 - **Types…** (the Forest menu, the workspace's ⋯, the library's footer) edits the open scene's flora profile: the types
@@ -176,6 +181,8 @@ With the plugin enabled, the forest grows around the editor camera.
   from the strip; the Bands tab. Every change is undoable in the dialog and written at once (key order and `_comment`
   keys kept); the scene's forest follows. A profile inside Wuifwoud (the starter flora) is read-only: *Save a copy for
   this map…*. A forest without one: *Create a profile…*.
+- **Species…** (the Forest menu, the workspace's ⋯, the inspector of a species or a pack) manages and builds the
+  species packs: see *Building packs*.
 
 Painted maps are files beside the terrain's region files: keep them under version control or back them up.
 

@@ -16,6 +16,15 @@
 - A type's own `mixes` in the flora profile; the Types dialog's first write turns a type's old pool keys (`pools`,
   `bush_pool`, `pool`, `tree_pool`, `dead`) into them, growing the same forest.
 - The workspace library lists the types in the profile's order.
+- Pictures and type icons on the existing surfaces: the workspace library's tiles and hover cards (the icon, the
+  numbers, each lane's heaviest species as pictures), Pick's readout, the Tree and Row panel's type chips, the Import
+  dialog's rule rows and type chips.
+- One species picker (a picture grid with a search and By type) in place of the species chips of the Tree and Row
+  panel and the Import dialog; it offers every species the packs grow.
+- The Tree and Row panel and the Import dialog list the types in the profile's order.
+- Right-click menus open at the mouse when the editor's windows float.
+- The native core's warning tells a library that did not load from one that is not built; `wuifwoud_core.gdextension`
+  asks for Godot 4.8.
 
 ## 1.0.0 (2026-10-08)
 
