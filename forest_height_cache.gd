@@ -129,25 +129,9 @@ func snapshot_around(x: float, z: float, size: float) -> ForestHeightCache:
 	return view
 
 
-## The same private view over EVERY region a rectangle overlaps, for consumers
-## whose cells can be larger than a region (a 1 km impostor cell), where the four
-## corners of snapshot_around would miss the regions in between.
-func snapshot_rect(x0: float, z0: float, x1: float, z1: float) -> ForestHeightCache:
-	var view := ForestHeightCache.new()
-	view.configure(region_size, vertex_spacing)
-	view.max_regions = 64        # a view never evicts; the cap belongs to the owner
-	var l0 := region_location(x0, z0)
-	var l1 := region_location(x1, z1)
-	for lx in range(l0.x, l1.x + 1):
-		for lz in range(l0.y, l1.y + 1):
-			var loc := Vector2i(lx, lz)
-			if _maps.has(loc):
-				view.store(loc, _maps[loc])
-	return view
-
-
 ## The regions a rectangle overlaps as a native place job takes them: [location, heights, …], the
-## arrays shared, not copied (copy on write; nothing writes them); the same regions snapshot_rect would view.
+## arrays shared, not copied (copy on write; nothing writes them): every region the rectangle overlaps that the cache
+## holds.
 func regions_rect(x0: float, z0: float, x1: float, z1: float) -> Array:
 	var out := []
 	var l0 := region_location(x0, z0)

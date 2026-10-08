@@ -19,6 +19,7 @@ const ForestConfigRes := preload("res://addons/wuifwoud/forest_config.gd")
 const ForestLogRes := preload("res://addons/wuifwoud/forest_log.gd")
 const ForestMapsRes := preload("res://addons/wuifwoud/forest_maps.gd")
 const FakeTerrain := preload("res://addons/wuifwoud/tests/fixtures/fake_terrain.gd")
+const FarRes := preload("res://addons/wuifwoud/forest_far.gd")
 const PROFILE_PATH := "user://wf_b3_far_profile.json"
 const CAT := {
 	"default_pack": {"mesh_dir": "res://addons/wuifwoud/tests/fake/m/", "ext": ".glb",
@@ -47,6 +48,12 @@ class Capture:
 
 	func take(level: StringName, msg: String) -> void:
 		lines.append([level, msg])
+
+
+## A native core whose far build fails (its window cannot be assembled).
+class FailCore:
+	func far_build_cell(_p: Dictionary) -> Dictionary:
+		return {"arrays": [], "quads": 0, "texels": PackedByteArray(), "tw": 0, "error": "no window"}
 
 
 static func _chk(r: Dictionary, n: String, ok: bool) -> void:
@@ -314,6 +321,15 @@ static func run() -> Dictionary:
 		band_hi.is_equal_approx(Vector2(3000.0, 660.0)) and band_lo.is_equal_approx(Vector2(1800.0, 600.0))
 		and band_none.x >= 1.0e8)
 
+	# ── a cell the native core cannot build: said once, with why ──
+	var fj := {"core": FailCore.new(), "p": {}, "out": {}, "error": ""}
+	FarRes._run_build(fj)
+	var said_before: int = cap.lines.size()
+	far._land_build({"kind": "build", "cell": Vector2i(99, 99), "gen": -1, "out": fj["out"], "error": fj["error"]})
+	far._land_build({"kind": "build", "cell": Vector2i(98, 99), "gen": -1, "out": fj["out"], "error": fj["error"]})
+	var build_said: Array = cap.lines.slice(said_before).filter(func(l): return String(l[1]).contains("could not build"))
+	_chk(r, "a cell the native core cannot build is said once, with why (%s)" % str(build_said),
+		String(fj["error"]) == "no window" and build_said.size() == 1 and String(build_said[0][1]).contains("no window"))
 	for v in [vp, vo, vn, vh, vb, vq]:
 		if v._far != null:
 			v._far.drain()

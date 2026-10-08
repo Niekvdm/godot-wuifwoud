@@ -556,14 +556,17 @@ func _submit_build(c: Vector2i) -> void:
 		"out_w": int(round(rm / float(forest.far_texel_m))), "s": int(round(rm / float(forest.far_grid_m))),
 		"sums": sums, "grounds": grounds, "heights": _palette.heights_table(), "styles": _palette.styles(),
 		"rules": forest.far_rules(), "seed": int(forest.forest_seed)}
-	var job := {"kind": "build", "cell": c, "gen": int(_cells[c]["gen"]), "p": p, "out": {}, "core": ForestNativeRes.core()}
+	var job := {"kind": "build", "cell": c, "gen": int(_cells[c]["gen"]), "p": p, "out": {}, "error": "",
+		"core": ForestNativeRes.core()}
 	_jobs[WorkerThreadPool.add_task(_run_build.bind(job), false, "forest_far_build")] = job
 
 
 ## WORKER. A cell's mesh arrays and its own far texels (the margin cut off, mipmapped) for the shader: the native core
-## assembles the cell from its window's summaries and grounds and builds its shell.
+## assembles the cell from its window's summaries and grounds and builds its shell; a cell the core cannot assemble
+## keeps its reason (`error`).
 static func _run_build(job: Dictionary) -> void:
 	var res: Dictionary = job["core"].far_build_cell(job["p"])
+	job["error"] = str(res.get("error", ""))
 	var tw := int(res.get("tw", 0))
 	if tw <= 0:
 		job["out"] = {"arrays": [], "quads": 0, "tex": null}
@@ -607,8 +610,12 @@ func _land_jobs(block: bool) -> void:
 
 
 ## A build into its cell: its mesh, then (this tick, or the next when the mesh used the box up: `sliced`) its texture,
-## material and node. Until then the cell draws the shell it had.
+## material and node. Until then the cell draws the shell it had. A cell the core could not build is said once a reason.
 func _land_build(job: Dictionary, sliced := false) -> void:
+	var why := str(job.get("error", ""))
+	if why != "":
+		_warn_once("build:" + why, ("[Wuifwoud] the far forest could not build a cell (%s): %s; it keeps what it drew "
+			+ "there") % [str(job.get("cell", "")), why])
 	var c: Vector2i = job["cell"]
 	var cell: Dictionary = _cells.get(c, {})
 	if cell.is_empty() or int(cell["gen"]) != int(job["gen"]):
