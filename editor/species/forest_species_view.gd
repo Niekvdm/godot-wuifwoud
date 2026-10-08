@@ -141,6 +141,8 @@ func _init() -> void:
 		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		tr.size_flags_horizontal = SIZE_EXPAND_FILL
+		if nm == "Albedo":
+			tr.resized.connect(_place_outline)   # placed again once the sheets are laid out (the first place is before)
 		_sheets.add_child(tr)
 	add_child(_sheets)
 	_outline = Panel.new()

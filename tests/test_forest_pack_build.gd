@@ -34,6 +34,23 @@ static func _chk(r: Dictionary, n: String, ok: bool) -> void:
 		r.details.append("✗ " + n)
 
 
+## A build as the plugin sees it: running until cancelled; the poll that ends it emits finished (what landed).
+class FakeBuild extends RefCounted:
+	signal finished(report: Dictionary)
+	var cancelled := false
+
+	func is_running() -> bool:
+		return not cancelled
+
+	func cancel() -> void:
+		cancelled = true
+
+	func poll() -> bool:
+		if cancelled:
+			finished.emit({"built": ["W_Tree"], "removed": []})
+		return cancelled
+
+
 ## The states of `pack`'s species: {id: state}.
 static func _states(pack) -> Dictionary:
 	var out := {}
@@ -278,6 +295,14 @@ static func run() -> Dictionary:
 		BuildRes.landed_anything({"built": ["W_Tree"], "removed": []})
 		and BuildRes.landed_anything({"built": [], "removed": ["W_Bush"]})
 		and not BuildRes.landed_anything({"built": [], "removed": [], "cancelled": true}))
+	# ── the plugin unloading mid-build ──
+	var fake := FakeBuild.new()
+	var landed := [0]
+	var on_landed := func(_rep: Dictionary) -> void: landed[0] += 1
+	fake.finished.connect(on_landed)
+	BuildRes.stop(fake, on_landed)
+	_chk(r, "a build stopped at unload is cancelled and runs no landing (%s)" % str([fake.cancelled, landed[0]]),
+		fake.cancelled and landed[0] == 0 and not fake.is_running())
 
 	VA.forget_packs()
 	VA.reset()

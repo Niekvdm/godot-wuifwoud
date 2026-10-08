@@ -33,6 +33,17 @@ static func _near(a: Color, b: Color) -> bool:
 	return absf(a.r - b.r) < 0.01 and absf(a.g - b.g) < 0.01 and absf(a.b - b.b) < 0.01
 
 
+## Every .gd under `dir`, its folders too.
+static func _scripts(dir: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	for f in DirAccess.get_files_at(dir):
+		if f.ends_with(".gd"):
+			out.append(dir.path_join(f))
+	for sub in DirAccess.get_directories_at(dir):
+		out.append_array(_scripts(dir.path_join(sub)))
+	return out
+
+
 static func run() -> Dictionary:
 	var r := {"name": "forest_types_wiring", "passed": 0, "failed": 0, "details": []}
 	var m = MenuRes.new()
@@ -76,6 +87,17 @@ static func run() -> Dictionary:
 	_chk(r, "the brush wears the selected type's colour", _near(p.decal_color(), Color("aa3300")))
 	_chk(r, "color_of is today's colour for an id; colour_of a type's own", ProviderRes.color_of(2) == TypeTileRes.colour_for_id(2)
 		and ProviderRes.colour_of(vp._types.get_type(4)) == Color.html("#aa3300"))
+	_chk(r, "the forest's types and a species' hand-over through its public API",
+		vp.forest_types() == vp._types
+		and vp.handover_of("W_B") == VA.handover_band(vp._species_cut_m("W_B"), vp._BILLBOARD_OVERLAP))
+	var private_reads := []
+	for sf in _scripts("res://addons/wuifwoud/editor"):
+		var src := FileAccess.get_file_as_string(sf)
+		for pat in ["._types.", "._types)", "._species_cut_m(", "._BILLBOARD_OVERLAP"]:
+			if src.contains(pat):
+				private_reads.append("%s: %s" % [sf.get_file(), pat])
+	_chk(r, "no editor script reads the forest's private types or hand-over (%s)" % str(private_reads),
+		private_reads.is_empty())
 	vp.free()
 	ForestConfigRes.use(null)
 	VA.forget_packs()

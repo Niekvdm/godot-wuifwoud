@@ -292,6 +292,18 @@ func cancel() -> void:
 	_cancel = true
 
 
+## Stop build `b` now, without its landing (`on_landed`, connected to its `finished`, is disconnected first): what the
+## editor does when the plugin unloads mid-build. A build that is not running is left alone.
+static func stop(b, on_landed: Callable) -> void:
+	if b == null or not b.is_running():
+		return
+	if b.finished.is_connected(on_landed):
+		b.finished.disconnect(on_landed)
+	b.cancel()
+	while not b.poll():     # a running store is image work: it ends on its own
+		OS.delay_msec(5)
+
+
 ## {"phase": "prepare" | "bake" | "store" | "land" | "done", "species": its id, "done": species finished, "total"}.
 func progress() -> Dictionary:
 	return _progress.duplicate()

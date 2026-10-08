@@ -1825,6 +1825,17 @@ func species_names() -> PackedStringArray:
 	return out
 
 
+## The forest types its profile loaded (ForestTypes): the editor reads them; nothing outside the forest changes them.
+func forest_types() -> ForestTypesRes:
+	return _types
+
+
+## Where species `mesh_name`'s mesh hands over to its card in this forest (ForestAssets.handover_band of its cut and the
+## card's overlap).
+func handover_of(mesh_name: String) -> Dictionary:
+	return ForestAssets.handover_band(_species_cut_m(mesh_name), _BILLBOARD_OVERLAP)
+
+
 ## Why a single tree or a row's tree at `p` would not grow there, for the Place tools' cursor note:
 ## "on a road", "under water", "too steep", or "" (it grows, or the ground is not known yet). The main thread.
 func item_gate(p: Vector2) -> String:

@@ -602,8 +602,8 @@ func _selected_section(f: Node, it: Dictionary) -> void:
 	var types := HFlowContainer.new()
 	types.name = "Types"
 	var tg := ButtonGroup.new()
-	for id in f._types.order():
-		var t: Dictionary = f._types.get_type(id)
+	for id in f.forest_types().order():
+		var t: Dictionary = f.forest_types().get_type(id)
 		var b: Button = _kit.toggle_chip(String(t.get("name", "type %d" % id)), int(it["type"]) == int(id), _accent)
 		b.name = "Type%d" % id
 		b.icon = TypeTileRes.texture(TypeTileRes.icon_for(t), TypeTileRes.colour_of(t), CHIP_ICON_PX)

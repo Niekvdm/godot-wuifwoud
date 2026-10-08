@@ -170,6 +170,10 @@ func _notification(what: int) -> void:
 		set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	elif what == NOTIFICATION_RESIZED and _panel != null and is_inside_tree():
 		_panel.custom_minimum_size = SIZE.min(get_viewport_rect().size - Vector2(40.0, 40.0))
+	elif what == NOTIFICATION_PREDELETE and view != null and is_instance_valid(view) and view.get_parent() == null:
+		# Kept across rebuilds, the view is no child while no species is shown: it goes with the dialog (the plugin
+		# unloading frees the dialog without close()).
+		view.free()
 
 
 ## The build shown here, every frame: its progress while it runs; when it ends, its report, the pictures and the states
@@ -677,8 +681,10 @@ func handover_for(id: String) -> Dictionary:
 	return VA.handover_band(300.0, 90.0)
 
 
-## Select species `id`.
+## Select species `id` ("": none); a question about another species goes.
 func select(id: String) -> void:
+	if id != selected:
+		asking = {}
 	selected = id
 	rebuild()
 

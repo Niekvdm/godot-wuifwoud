@@ -24,6 +24,11 @@ static func _chk(r: Dictionary, n: String, ok: bool) -> void:
 		r.details.append("✗ " + n)
 
 
+static func _frames(n: int) -> void:
+	for i in n:
+		await (Engine.get_main_loop() as SceneTree).process_frame
+
+
 static func run() -> Dictionary:
 	var r := {"name": "forest_species_view", "passed": 0, "failed": 0, "details": []}
 	var t := ViewRes.orbit(35.0, 18.0, 20.0, Vector3(0, 5, 0))
@@ -93,5 +98,37 @@ static func run() -> Dictionary:
 	if not d.is_queued_for_deletion():
 		d.free()
 	_chk(r, "freed with its world when the dialog closes", ref.get_ref() == null or (ref.get_ref() as Node).is_queued_for_deletion())
+	var made2: Array = Fix.dialog(fx)
+	var d2 = made2[0]
+	d2.select("W_Tree")
+	d2.select("")
+	var detached = d2.view
+	var was_detached: bool = detached != null and (detached as Node).get_parent() == null
+	var ref2 := weakref(detached)
+	d2.free()
+	_chk(r, "a view a rebuild left detached goes with the dialog (the plugin unloading it) (%s)" % str(was_detached),
+		was_detached and ref2.get_ref() == null)
+	# ── the sheet outline follows the sheets' layout ──
+	var host := SubViewport.new()
+	host.size = Vector2i(800, 400)
+	(Engine.get_main_loop() as SceneTree).root.add_child(host)
+	var lv = ViewRes.new()
+	lv.show_species(pack.species[0], dir, man, "built")
+	lv.parts["ring"] = {"albedo": ImageTexture.create_from_image(Image.create_empty(8, 8, false, Image.FORMAT_RGBA8)),
+		"normal": ImageTexture.create_from_image(Image.create_empty(8, 8, false, Image.FORMAT_RGBA8)),
+		"grid": 8, "cols": 8, "rows": 8, "span": 10.0, "w": 5.0, "h": 9.0}
+	host.add_child(lv)
+	(lv as Control).set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	lv.set_mode("sheets")
+	await _frames(3)
+	var tr := lv.find_child("Albedo", true, false) as TextureRect
+	var side := minf(tr.size.x, tr.size.y)
+	var px := side / float(BakerRes.GRID)
+	var want: Vector2 = tr.position + (tr.size - Vector2(side, side)) * 0.5 + Vector2(lv.view_cell()) * px
+	var ol := lv.find_child("Outline", true, false) as Control
+	_chk(r, "the sheet outline sits on the view's cell once the sheets are laid out (%s, want %s)" % [str(ol.position), str(want)],
+		px > 1.0 and ol.visible and ol.position.is_equal_approx(want) and is_equal_approx(ol.size.x, px))
+	host.queue_free()
+	await _frames(1)
 	Fix.TreeFix.rm_tree(ROOT)
 	return r

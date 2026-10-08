@@ -180,7 +180,7 @@ func decal_color() -> Color:
 	if selected <= 0:
 		return Color.WHITE
 	var f := _forest()
-	var t: Dictionary = f._types.get_type(selected) if f != null else {}
+	var t: Dictionary = f.forest_types().get_type(selected) if f != null else {}
 	return colour_of(t) if not t.is_empty() else color_of(selected)
 
 
@@ -215,8 +215,8 @@ func library() -> Dictionary:
 	var items := []
 	var footer := "no forest in this scene"
 	if f != null:
-		for id in f._types.order():
-			var t: Dictionary = f._types.get_type(id)
+		for id in f.forest_types().order():
+			var t: Dictionary = f.forest_types().get_type(id)
 			items.append({"id": id, "name": String(t["name"]),
 				"picture": TypeTileRes.texture(TypeTileRes.icon_for(t), colour_of(t), LIBRARY_PX), "card": _card.bind(t)})
 		footer = "%d types · %s" % [items.size(), String(f.profile_path).get_file()]
@@ -370,7 +370,7 @@ func build_header(box: VBoxContainer, kit: Object, _accent: Color) -> void:
 	row.name = "Picked"
 	row.add_theme_constant_override("separation", 6)
 	var f := _forest()
-	var t: Dictionary = f._types.get_type(picked_type) if f != null and picked_type > 0 else {}
+	var t: Dictionary = f.forest_types().get_type(picked_type) if f != null and picked_type > 0 else {}
 	if not t.is_empty():
 		var ic := TypeTileRes.tile(TypeTileRes.icon_for(t), colour_of(t), PICK_ICON_PX)
 		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -625,7 +625,7 @@ func _pick(f: Node, p_hit: Vector3) -> void:
 		return
 	var nm := "no forest"
 	if px[0] != 0:
-		var t: Dictionary = f._types.get_type(px[0])
+		var t: Dictionary = f.forest_types().get_type(px[0])
 		nm = String(t.get("name", "type %d (not in the profile)" % px[0]))
 		if not t.is_empty():
 			selected = px[0]

@@ -812,8 +812,8 @@ static func context_for(forest: Node, p_kit: Object) -> Dictionary:
 	var dd = t.get("data_directory") if t != null else null
 	ctx["terrain_dir"] = String(dd) if dd != null else ""
 	ctx["maps_dir"] = String(forest.maps.directory)
-	for id in forest._types.order():
-		var ty: Dictionary = forest._types.get_type(id)
+	for id in forest.forest_types().order():
+		var ty: Dictionary = forest.forest_types().get_type(id)
 		ctx["types"].append({"id": id, "name": String(ty.get("name", "type %d" % id)), "colour": ProviderRes.colour_of(ty),
 			"icon": TypeTileRes.icon_for(ty)})
 	ctx["species"] = Array(forest.species_names())

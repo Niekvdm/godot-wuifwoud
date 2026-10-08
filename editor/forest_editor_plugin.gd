@@ -100,12 +100,7 @@ func _exit_tree() -> void:
 		_job.cancel()
 		while not _job.poll():
 			OS.delay_msec(5)
-	if _build != null and _build.is_running():
-		if _build.finished.is_connected(_on_built):
-			_build.finished.disconnect(_on_built)   # no landing (a rescan, a regrow) while the plugin unloads
-		_build.cancel()
-		while not _build.poll():     # a running store is image work: it ends on its own
-			OS.delay_msec(5)
+	BuildRes.stop(_build, _on_built)   # no landing (a rescan, a regrow) while the plugin unloads
 	if _species_dialog != null and is_instance_valid(_species_dialog):
 		_species_dialog.queue_free()
 	_species_dialog = null
@@ -305,7 +300,7 @@ func _species_uses() -> Dictionary:
 	if f == null:
 		return {}
 	var doc := _mapping_doc()
-	return UseRes.of(f._types.by_id, f.trees.items, (doc.get("rules", []) as Array) if doc is Dictionary else [])
+	return UseRes.of(f.forest_types().by_id, f.trees.items, (doc.get("rules", []) as Array) if doc is Dictionary else [])
 
 
 ## A species' mesh-to-card hand-over in the edited scene's forest (the defaults without one).
@@ -313,7 +308,7 @@ func _handover(id: String) -> Dictionary:
 	var f := _forest()
 	if f == null:
 		return ForestAssetsRes.handover_band(300.0, 90.0)
-	return ForestAssetsRes.handover_band(f._species_cut_m(id), f._BILLBOARD_OVERLAP)
+	return f.handover_of(id)
 
 
 ## The Species dialog's Build: a pack build of `packs` with `options` (ForestPackBuild's: force, only) started, its bake

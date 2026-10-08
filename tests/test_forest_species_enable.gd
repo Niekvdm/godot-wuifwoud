@@ -54,6 +54,10 @@ static func run() -> Dictionary:
 	_chk(r, "a used species asks first, naming what loses it",
 		not d.config.disabled_species.has("W_Tree") and d.find_child("Question", true, false) != null
 		and String(d.asking.get("text", "")).contains("Wood (coast, mid)"))
+	d.select("W_Bush")
+	_chk(r, "a question about one species goes when another is selected",
+		d.asking.is_empty() and d.find_child("Question", true, false) == null)
+	d.select("W_Tree")
 	d.cancel_question()
 	_chk(r, "Keep it changes nothing", d.asking.is_empty() and not d.config.disabled_species.has("W_Tree"))
 	d.set_species_enabled("W_Tree", false)
