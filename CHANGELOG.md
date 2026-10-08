@@ -25,6 +25,16 @@
 - Right-click menus open at the mouse when the editor's windows float.
 - The native core's warning tells a library that did not load from one that is not built; `wuifwoud_core.gdextension`
   asks for Godot 4.8.
+- A grid type needs no bush pool. A compressed or mipmapped forest map is read whole; a map's format warning is said
+  once.
+- The species picker: Enter picks the first match; a search hides tiles rather than rebuilding them, as the Types
+  dialog's strip search now leaves the dialog as it is.
+- A Revert asked while the import's source is being read lands by itself once it is.
+- The Import dialog names the profile a missing type is not in; its report's area by type carries the type icons; its
+  progress ends at N of N.
+- The far forest says why the native core could not build a cell. A forest with single trees but no maps says only they
+  grow.
+- `ForestConfig.addon_dir()`, `ForestSpawner.forest_types()` and `ForestSpawner.handover_of()` are public for editor code.
 
 ## 1.0.0 (2026-10-08)
 
