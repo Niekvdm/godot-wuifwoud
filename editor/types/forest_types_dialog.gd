@@ -20,6 +20,12 @@ const ProfileRes := preload("res://addons/wuifwoud/forest_profile.gd")
 const ListRes := preload("res://addons/wuifwoud/editor/types/forest_type_list.gd")
 ## The middle column.
 const PanelRes := preload("res://addons/wuifwoud/editor/types/forest_type_panel.gd")
+## The right column.
+const LanesRes := preload("res://addons/wuifwoud/editor/types/forest_type_lanes.gd")
+## The species strip (its drag kind).
+const StripRes := preload("res://addons/wuifwoud/editor/types/forest_species_strip.gd")
+## The species pictures.
+const PicturesRes := preload("res://addons/wuifwoud/editor/common/forest_pictures.gd")
 ## The type icons.
 const TypeTileRes := preload("res://addons/wuifwoud/editor/common/forest_type_tile.gd")
 ## The forest's species.
@@ -382,62 +388,6 @@ func move_type(src: int, onto: int) -> void:
 	change(func() -> String: return profile.move_type(src, profile.index_of(onto)))
 
 
-## Type `id`'s setting `key` set to `value` (ForestProfile.set_value): one undo step. A text field losing its focus to
-## the rebuild that takes it down hands its edit over here: it is applied once the rebuild is done, not dropped.
-func set_value(id: int, key: String, value) -> void:
-	if _rebuilding:
-		_pending.append([id, key, value])
-		if _pending.size() == 1:
-			_apply_pending.call_deferred()
-		return
-	var t: Dictionary = profile.type_of(id)
-	if t.has(key) and typeof(t[key]) == typeof(value) and t[key] == value:
-		return
-	change(func() -> String: return profile.set_value(id, key, value))
-
-
-## The edits set_value was handed during a rebuild, applied now.
-func _apply_pending() -> void:
-	var todo := _pending
-	_pending = []
-	for e in todo:
-		set_value(int(e[0]), String(e[1]), e[2])
-
-
-## Type `id`'s style (ForestProfile.set_style): one undo step.
-func set_style(id: int, style: String) -> void:
-	lane_pick = {}
-	change(func() -> String: return profile.set_style(id, style))
-
-
-## What type `id` grows, in words, and which import rules paint it: "One tree every 5.1 m · painted by import rule 2".
-func footer_text(id: int) -> String:
-	var style := str(profile.value_of(id, "style"))
-	var grows := ""
-	if style == "grid":
-		grows = "A tree every %s m on a grid" % num(float(profile.value_of(id, "pitch_m")), 2)
-	else:
-		var dn := float(profile.value_of(id, "density_per_m2"))
-		grows = ("One %s every %.1f m" % ["bush" if style == "bushes" else "tree", 1.0 / sqrt(dn)]) if dn > 0.0 \
-			else "Grows nothing: no density"
-	var rules := rules_painting(id)
-	return "%s · %s" % [grows, ("painted by " + ", ".join(rules)) if not rules.is_empty() else "no import rule paints it"]
-
-
-## Which types grow the map's defaults, and in which lanes: "Inherited by: Wood (mid, high), Garden (trees)".
-func inheritors_text() -> String:
-	var parts := PackedStringArray()
-	for id in profile.type_ids():
-		var t: Dictionary = profile.type_of(id)
-		var lanes := PackedStringArray()
-		for lane in ProfileRes.lanes_for(str(t.get("style", ""))):
-			if String(profile.lane_of(id, lane)["from"]) != "own":
-				lanes.append(lane)
-		if not lanes.is_empty():
-			parts.append("%s (%s)" % [str(t.get("name", "")), ", ".join(lanes)])
-	return "Inherited by: " + (", ".join(parts) if not parts.is_empty() else "no type: every lane has a mix of its own.")
-
-
 ## The question's action.
 func confirm_question() -> void:
 	var f: Callable = asking.get("do", Callable())
@@ -519,6 +469,258 @@ static func num(v: float, decimals: int) -> String:
 	if s.contains("."):
 		s = s.rstrip("0").rstrip(".")
 	return s
+
+
+# --- a type's settings ---
+
+## Type `id`'s setting `key` set to `value` (ForestProfile.set_value): one undo step. A text field losing its focus to
+## the rebuild that takes it down hands its edit over here: it is applied once the rebuild is done, not dropped.
+func set_value(id: int, key: String, value) -> void:
+	if _rebuilding:
+		_pending.append([id, key, value])
+		if _pending.size() == 1:
+			_apply_pending.call_deferred()
+		return
+	var t: Dictionary = profile.type_of(id)
+	if t.has(key) and typeof(t[key]) == typeof(value) and t[key] == value:
+		return
+	change(func() -> String: return profile.set_value(id, key, value))
+
+
+## The edits set_value was handed during a rebuild, applied now.
+func _apply_pending() -> void:
+	var todo := _pending
+	_pending = []
+	for e in todo:
+		set_value(int(e[0]), String(e[1]), e[2])
+
+
+## Type `id`'s style (ForestProfile.set_style): one undo step.
+func set_style(id: int, style: String) -> void:
+	lane_pick = {}
+	change(func() -> String: return profile.set_style(id, style))
+
+
+## What type `id` grows, in words, and which import rules paint it: "One tree every 5.1 m · painted by import rule 2".
+func footer_text(id: int) -> String:
+	var style := str(profile.value_of(id, "style"))
+	var grows := ""
+	if style == "grid":
+		grows = "A tree every %s m on a grid" % num(float(profile.value_of(id, "pitch_m")), 2)
+	else:
+		var dn := float(profile.value_of(id, "density_per_m2"))
+		grows = ("One %s every %.1f m" % ["bush" if style == "bushes" else "tree", 1.0 / sqrt(dn)]) if dn > 0.0 \
+			else "Grows nothing: no density"
+	var rules := rules_painting(id)
+	return "%s · %s" % [grows, ("painted by " + ", ".join(rules)) if not rules.is_empty() else "no import rule paints it"]
+
+
+## Which types grow the map's defaults, and in which lanes: "Inherited by: Wood (mid, high), Garden (trees)".
+func inheritors_text() -> String:
+	var parts := PackedStringArray()
+	for id in profile.type_ids():
+		var t: Dictionary = profile.type_of(id)
+		var lanes := PackedStringArray()
+		for lane in ProfileRes.lanes_for(str(t.get("style", ""))):
+			if String(profile.lane_of(id, lane)["from"]) != "own":
+				lanes.append(lane)
+		if not lanes.is_empty():
+			parts.append("%s (%s)" % [str(t.get("name", "")), ", ".join(lanes)])
+	return "Inherited by: " + (", ".join(parts) if not parts.is_empty() else "no type: every lane has a mix of its own.")
+
+
+# --- the lanes ---
+
+## Whether lane `lane` of the selected row inherits: a type's without its own mix, a default the profile lacks.
+func inheriting(lane: String) -> bool:
+	var from := String(profile.lane_of(selected, lane)["from"])
+	return from != "map" if selected == 0 else from != "own"
+
+
+## A lane's band or role: "0-150 m", "the understory", "on a 7 m grid".
+func lane_range(lane: String) -> String:
+	var b: Dictionary = profile.bands()
+	match lane:
+		"coast":
+			return "0-%d m" % int(b["coast_top_m"])
+		"mid":
+			return "%d-%d m" % [int(b["coast_top_m"]), int(b["mid_top_m"])]
+		"high":
+			return "%d-%d m" % [int(b["mid_top_m"]), int(b["treeline_m"])]
+		"bush":
+			return "the understory" if str(profile.value_of(selected, "style")) == "natural" else ""
+		"grid":
+			return "on a %s m grid" % num(float(profile.value_of(selected, "pitch_m")), 2) if selected != 0 else "the orchard pool"
+	return ""
+
+
+## What an inheriting lane grows, said: the map's default, the project's, or nothing.
+func inherit_text(lane: String) -> String:
+	var cur: Dictionary = profile.lane_of(selected, lane)
+	var who := str(profile.type_of(selected).get("name", "this type"))
+	match String(cur["from"]):
+		"map":
+			return "The map's default mix (pool %s): add a species to give %s its own." % [cur["pool"], who]
+		"fallback":
+			if selected == 0:
+				return "The project's default (pool %s of the fallback flora): add a species to set this map's own." % cur["pool"]
+			return "The project's default (pool %s of the fallback flora): add a species to give %s its own." % [cur["pool"], who]
+	if ProfileRes.is_dead(lane):
+		return "No dead trees here."
+	return "No pool %s in the profile or the fallback flora: add a species to give this lane a mix." % cur["pool"]
+
+
+## Why species `id` grows nowhere ("" when it grows): "switched off", or "in no species pack".
+func species_why(id: String) -> String:
+	if VA.species_of(id) != null:
+		return ""
+	return "switched off" if VA.is_disabled(id) else "in no species pack"
+
+
+## Species `id`'s picture: its build's, else its crown's glyph; a broadleaf glyph when no pack has it.
+func picture_of(id: String) -> Texture2D:
+	var sp = VA.species_of(id)
+	return PicturesRes.of(sp, VA.built_dir_of(id)) if sp != null else PicturesRes.glyph("broadleaf")
+
+
+## Species `sp` added to lane `lane` of the selected row: one undo step.
+func add_to_lane(lane: String, sp: String) -> void:
+	lane_focus = lane
+	change(func() -> String: return profile.add_to_lane(selected, lane, sp))
+
+
+## Species `sp` taken out of lane `lane`: one undo step.
+func remove_from_lane(lane: String, sp: String) -> void:
+	lane_pick = {}
+	change(func() -> String: return profile.remove_from_lane(selected, lane, sp))
+
+
+## Species `sp`'s weight in lane `lane`: one undo step.
+func set_weight(lane: String, sp: String, w: float) -> void:
+	change(func() -> String: return profile.set_weight(selected, lane, sp, w))
+
+
+## Species `sp` moved from lane `from_lane` to `to_lane` (onto its own lane: nothing): one undo step.
+func move_tile(from_lane: String, to_lane: String, sp: String) -> void:
+	if from_lane == to_lane:
+		return
+	lane_pick = {}
+	change(func() -> String: return profile.move_between(selected, from_lane, to_lane, sp))
+
+
+## Lane `lane` set to a copy of lane `from_lane` of type `from_id` (0: the default): one undo step.
+func copy_lane(lane: String, from_id: int, from_lane: String) -> void:
+	change(func() -> String: return profile.copy_lane(selected, lane, from_id, from_lane))
+
+
+## Lane `lane` back to what it inherits: one undo step.
+func reset_lane(lane: String) -> void:
+	lane_pick = {}
+	change(func() -> String: return profile.reset_lane(selected, lane))
+
+
+## A drop on lane `lane`: a species from the strip joins it, a lane's tile moves to it.
+func drop_on_lane(lane: String, kind: String, id: String) -> void:
+	if kind == StripRes.KIND:
+		add_to_lane(lane, id)
+	elif kind == LANE_KIND:
+		move_tile(id.get_slice("|", 0), lane, id.get_slice("|", 1))
+
+
+## A lane's tile dropped outside every lane: it leaves its lane.
+func drop_out(kind: String, id: String) -> void:
+	if kind == LANE_KIND:
+		remove_from_lane(id.get_slice("|", 0), id.get_slice("|", 1))
+
+
+## A lane's tile clicked: its weight and ✕ (clicked again: hidden); its lane takes the focus.
+func pick_tile(lane: String, sp: String) -> void:
+	var same := String(lane_pick.get("lane", "")) == lane and String(lane_pick.get("id", "")) == sp
+	lane_pick = {} if same else {"lane": lane, "id": sp}
+	lane_focus = lane
+	rebuild()
+
+
+## The lane a click on the strip adds to.
+func focus_lane(lane: String) -> void:
+	lane_focus = lane
+	rebuild()
+
+
+## The lane in focus by name ("Coast", "Dead (mid)"): the first lane shown when none is.
+func focus_title() -> String:
+	var lanes := lanes_shown()
+	if not ProfileRes.with_dead(lanes).has(lane_focus):
+		return LanesRes.lane_title(String(lanes[0])) if not lanes.is_empty() else "a lane"
+	return LanesRes.lane_title(lane_focus)
+
+
+## Lanes of the same kind as `lane` that Copy from… offers, [{"text", "id", "lane"}]: the default first (a type
+## selected), then every other type's.
+func copy_sources(lane: String) -> Array:
+	var kind := ProfileRes.kind_of(lane)
+	var out := []
+	if selected != 0:
+		out.append({"text": "The default (pool %s)" % ProfileRes.default_pool(lane), "id": 0, "lane": lane})
+	for id in profile.type_ids():
+		if id == selected:
+			continue
+		var t: Dictionary = profile.type_of(id)
+		for l in ProfileRes.with_dead(ProfileRes.lanes_for(str(t.get("style", "")))):
+			if ProfileRes.kind_of(String(l)) == kind:
+				out.append({"text": "%s · %s" % [str(t.get("name", "")), LanesRes.lane_title(String(l))], "id": id,
+					"lane": String(l)})
+	return out
+
+
+# --- the species strip ---
+
+## The species the strip shows: every species the forest grows (its packs' minus the switched-off ones), narrowed by
+## the search (id or display name) and the filter.
+func strip_ids() -> PackedStringArray:
+	var q := strip_search.strip_edges().to_lower()
+	var out := PackedStringArray()
+	for id in VA.species_ids():
+		var sp = VA.species_of(id)
+		if sp == null:
+			continue
+		if q != "" and not String(id).to_lower().contains(q) and not String(sp.display_name).to_lower().contains(q):
+			continue
+		if strip_filter == "trees" and String(sp.kind) == "bush":
+			continue
+		if strip_filter == "bushes" and String(sp.kind) != "bush":
+			continue
+		out.append(id)
+	return out
+
+
+## A strip tile clicked: it joins the lane in focus (the first lane shown when none is).
+func strip_click(id: String) -> void:
+	var lanes := lanes_shown()
+	if not ProfileRes.with_dead(lanes).has(lane_focus):
+		lane_focus = String(lanes[0]) if not lanes.is_empty() else ""
+	if lane_focus != "":
+		add_to_lane(lane_focus, id)
+
+
+## A search keystroke: the view is rebuilt after the field's signal (never inside it) and the new field keeps the typing.
+func strip_search_changed(t: String) -> void:
+	strip_search = t
+	_apply_strip_search.call_deferred()
+
+
+func _apply_strip_search() -> void:
+	rebuild()
+	var f := _content.find_child("StripSearch", true, false) as LineEdit
+	if f != null and f.is_inside_tree():
+		f.grab_focus()
+		f.caret_column = f.text.length()
+
+
+## Show only some species in the strip.
+func set_strip_filter(f: String) -> void:
+	strip_filter = f
+	rebuild()
 
 
 # --- a profile of its own ---
@@ -690,13 +892,9 @@ func _panel_column() -> Control:
 	return PanelRes.build(self)
 
 
-## The right column: empty until the lanes are built.
+## The right column: the selected row's lanes and the species strip.
 func _lanes_column() -> Control:
-	var v := VBoxContainer.new()
-	v.name = "Lanes"
-	v.size_flags_horizontal = SIZE_EXPAND_FILL
-	v.size_flags_stretch_ratio = 1.6
-	return v
+	return LanesRes.build(self)
 
 
 ## The Bands tab: empty until it is built.
