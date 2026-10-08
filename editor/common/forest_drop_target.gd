@@ -2,13 +2,15 @@
 # SPDX-License-Identifier: MIT
 @tool
 extends PanelContainer
-## Where a dragged value or a rule's handle can be dropped in the Import dialog: it takes the
-## drag kinds in `kinds` and calls `on_drop(kind, id)`, wearing its hover style while one it takes is over it. A click
-## emits `pressed` (a rule row selects its rule). Its children must be MOUSE_FILTER_IGNORE or PASS: Godot stops looking
-## for a drop target at a STOP control.
+## Where a dragged value, a rule's handle, a type's handle or a species can be dropped in Wuifwoud's dialogs: it
+## takes the drag kinds in `kinds` and calls `on_drop(kind, id)`, wearing its hover style while one it takes is over
+## it. A click emits `pressed` (a rule row selects its rule), a right click `menu_requested`. Its children must be
+## MOUSE_FILTER_IGNORE or PASS: Godot stops looking for a drop target at a STOP control.
 
 ## Clicked (a rule row selects its rule).
 signal pressed
+## Right-clicked, at the screen position `at` (a type row's menu).
+signal menu_requested(at: Vector2)
 
 ## Empty: takes nothing (a clickable panel)
 var kinds: Array = []
@@ -47,8 +49,14 @@ func _notification(what: int) -> void:
 
 
 func _gui_input(ev: InputEvent) -> void:
-	if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and ev.pressed:
+	var mb := ev as InputEventMouseButton
+	if mb == null or not mb.pressed:
+		return
+	if mb.button_index == MOUSE_BUTTON_LEFT:
 		pressed.emit()
+		accept_event()
+	elif mb.button_index == MOUSE_BUTTON_RIGHT:
+		menu_requested.emit(get_global_mouse_position())
 		accept_event()
 
 

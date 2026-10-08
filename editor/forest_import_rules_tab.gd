@@ -8,7 +8,7 @@ extends RefCounted
 ## (the inspector).
 
 ## A drop target.
-const DropRes := preload("res://addons/wuifwoud/editor/forest_drop_target.gd")
+const DropRes := preload("res://addons/wuifwoud/editor/common/forest_drop_target.gd")
 ## A value tile.
 const TileRes := preload("res://addons/wuifwoud/editor/forest_value_tile.gd")
 ## The rule inspector.
