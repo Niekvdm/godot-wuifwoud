@@ -141,6 +141,13 @@ static func has_species(mesh_name: String) -> bool:
 	return _species.has(mesh_name)
 
 
+## Species `mesh_name` (a ForestSpecies) of the resolved packs, or null when it is switched off or in no pack: no
+## warning (the editor asks for any id a profile names).
+static func species_of(mesh_name: String):
+	_ensure_packs()
+	return _species.get(mesh_name)
+
+
 ## A species' trunk collider radius (m); a species no pack has gets DEFAULT_TRUNK_RADIUS.
 static func trunk_radius_for(mesh_name: String) -> float:
 	var sp = _species_entry(mesh_name)
