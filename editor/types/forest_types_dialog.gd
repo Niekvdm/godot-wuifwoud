@@ -18,6 +18,8 @@ signal changed
 const ProfileRes := preload("res://addons/wuifwoud/forest_profile.gd")
 ## The left column.
 const ListRes := preload("res://addons/wuifwoud/editor/types/forest_type_list.gd")
+## The middle column.
+const PanelRes := preload("res://addons/wuifwoud/editor/types/forest_type_panel.gd")
 ## The type icons.
 const TypeTileRes := preload("res://addons/wuifwoud/editor/common/forest_type_tile.gd")
 ## The forest's species.
@@ -380,6 +382,62 @@ func move_type(src: int, onto: int) -> void:
 	change(func() -> String: return profile.move_type(src, profile.index_of(onto)))
 
 
+## Type `id`'s setting `key` set to `value` (ForestProfile.set_value): one undo step. A text field losing its focus to
+## the rebuild that takes it down hands its edit over here: it is applied once the rebuild is done, not dropped.
+func set_value(id: int, key: String, value) -> void:
+	if _rebuilding:
+		_pending.append([id, key, value])
+		if _pending.size() == 1:
+			_apply_pending.call_deferred()
+		return
+	var t: Dictionary = profile.type_of(id)
+	if t.has(key) and typeof(t[key]) == typeof(value) and t[key] == value:
+		return
+	change(func() -> String: return profile.set_value(id, key, value))
+
+
+## The edits set_value was handed during a rebuild, applied now.
+func _apply_pending() -> void:
+	var todo := _pending
+	_pending = []
+	for e in todo:
+		set_value(int(e[0]), String(e[1]), e[2])
+
+
+## Type `id`'s style (ForestProfile.set_style): one undo step.
+func set_style(id: int, style: String) -> void:
+	lane_pick = {}
+	change(func() -> String: return profile.set_style(id, style))
+
+
+## What type `id` grows, in words, and which import rules paint it: "One tree every 5.1 m · painted by import rule 2".
+func footer_text(id: int) -> String:
+	var style := str(profile.value_of(id, "style"))
+	var grows := ""
+	if style == "grid":
+		grows = "A tree every %s m on a grid" % num(float(profile.value_of(id, "pitch_m")), 2)
+	else:
+		var dn := float(profile.value_of(id, "density_per_m2"))
+		grows = ("One %s every %.1f m" % ["bush" if style == "bushes" else "tree", 1.0 / sqrt(dn)]) if dn > 0.0 \
+			else "Grows nothing: no density"
+	var rules := rules_painting(id)
+	return "%s · %s" % [grows, ("painted by " + ", ".join(rules)) if not rules.is_empty() else "no import rule paints it"]
+
+
+## Which types grow the map's defaults, and in which lanes: "Inherited by: Wood (mid, high), Garden (trees)".
+func inheritors_text() -> String:
+	var parts := PackedStringArray()
+	for id in profile.type_ids():
+		var t: Dictionary = profile.type_of(id)
+		var lanes := PackedStringArray()
+		for lane in ProfileRes.lanes_for(str(t.get("style", ""))):
+			if String(profile.lane_of(id, lane)["from"]) != "own":
+				lanes.append(lane)
+		if not lanes.is_empty():
+			parts.append("%s (%s)" % [str(t.get("name", "")), ", ".join(lanes)])
+	return "Inherited by: " + (", ".join(parts) if not parts.is_empty() else "no type: every lane has a mix of its own.")
+
+
 ## The question's action.
 func confirm_question() -> void:
 	var f: Callable = asking.get("do", Callable())
@@ -627,12 +685,9 @@ func _body() -> Control:
 	return v
 
 
-## The middle column: empty until the panel is built.
+## The middle column: the selected row's settings.
 func _panel_column() -> Control:
-	var v := VBoxContainer.new()
-	v.name = "TypePanel"
-	v.size_flags_horizontal = SIZE_EXPAND_FILL
-	return v
+	return PanelRes.build(self)
 
 
 ## The right column: empty until the lanes are built.
