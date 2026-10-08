@@ -621,6 +621,8 @@ func _land_build(job: Dictionary, sliced := false) -> void:
 	if cell.is_empty() or int(cell["gen"]) != int(job["gen"]):
 		stats["dropped"] = int(stats["dropped"]) + 1
 		return
+	if why != "":
+		return    # the cell keeps the shell it drew
 	var out: Dictionary = job["out"]
 	var arrays: Array = out["arrays"]
 	if arrays.is_empty():

@@ -330,6 +330,15 @@ static func run() -> Dictionary:
 	var build_said: Array = cap.lines.slice(said_before).filter(func(l): return String(l[1]).contains("could not build"))
 	_chk(r, "a cell the native core cannot build is said once, with why (%s)" % str(build_said),
 		String(fj["error"]) == "no window" and build_said.size() == 1 and String(build_said[0][1]).contains("no window"))
+	var kept_mi := MeshInstance3D.new()
+	far.add_child(kept_mi)
+	far._cells[Vector2i(97, 99)] = {"gen": 3, "node": kept_mi, "quads": 5}
+	far._land_build({"kind": "build", "cell": Vector2i(97, 99), "gen": 3, "out": fj["out"], "error": fj["error"]})
+	_chk(r, "a cell the core cannot build keeps the shell it drew there",
+		is_same(far._cells[Vector2i(97, 99)]["node"], kept_mi) and not kept_mi.is_queued_for_deletion()
+		and int(far._cells[Vector2i(97, 99)]["quads"]) == 5)
+	far._drop_node(Vector2i(97, 99))
+	far._cells.erase(Vector2i(97, 99))
 	for v in [vp, vo, vn, vh, vb, vq]:
 		if v._far != null:
 			v._far.drain()
