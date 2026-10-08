@@ -23,22 +23,23 @@
         "res://addons/wuifwoud/packs/starter/meshes/Leaves_TwistedTree_C.png": "7256ffdde33f9d884d47fffe4ec9a5f6"
       },
       "pack": "starter.tres",
+      "picture": true,
       "prep_version": 1,
       "settings": "8414812ca296de5b865369d7f0bb922e",
       "sources": {
         "res://addons/wuifwoud/packs/starter/meshes/Bush_Common.bin": {
           "md5": "10b92b0078811fcab882582efecc6e56",
-          "mtime": 1722110970,
+          "mtime": 1791436464,
           "size": 91800
         },
         "res://addons/wuifwoud/packs/starter/meshes/Bush_Common.gltf": {
           "md5": "d2de67e7fef13c8fd7a649d660d64a50",
-          "mtime": 1722110970,
+          "mtime": 1791436464,
           "size": 2101
         },
         "res://addons/wuifwoud/packs/starter/meshes/Leaves_TwistedTree_C.png": {
           "md5": "d97ec3308cc6d22d4a85cef33c34deee",
-          "mtime": 1721489074,
+          "mtime": 1791436464,
           "size": 70353
         }
       },
@@ -63,32 +64,33 @@
         "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png": "7256ffdde33f9d884d47fffe4ec9a5f6"
       },
       "pack": "starter.tres",
+      "picture": true,
       "prep_version": 1,
       "settings": "1f2d3c4d786efe239f9d04a1b6f2b581",
       "sources": {
         "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png": {
           "md5": "67b17974d8066394d8e1e25eaa83a6df",
-          "mtime": 1791402187,
+          "mtime": 1791436464,
           "size": 1024360
         },
         "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png": {
           "md5": "8fefd17af159857beadd9df19439b2a8",
-          "mtime": 1791402189,
+          "mtime": 1791436464,
           "size": 1117297
         },
         "res://addons/wuifwoud/packs/starter/meshes/CommonTree_3.bin": {
           "md5": "c141fc8e4c3ef5e90f74fe73cee587d2",
-          "mtime": 1721488288,
+          "mtime": 1791436464,
           "size": 296984
         },
         "res://addons/wuifwoud/packs/starter/meshes/CommonTree_3.gltf": {
           "md5": "218f7f9d1d6987ea03f87d73e11c228e",
-          "mtime": 1721488288,
+          "mtime": 1791436464,
           "size": 3864
         },
         "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png": {
           "md5": "4761d9780e45a5ae95d02b0138a467c4",
-          "mtime": 1721830306,
+          "mtime": 1791436464,
           "size": 158796
         }
       },
@@ -113,32 +115,33 @@
         "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png": "7256ffdde33f9d884d47fffe4ec9a5f6"
       },
       "pack": "starter.tres",
+      "picture": true,
       "prep_version": 1,
       "settings": "1f2d3c4d786efe239f9d04a1b6f2b581",
       "sources": {
         "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png": {
           "md5": "67b17974d8066394d8e1e25eaa83a6df",
-          "mtime": 1791402187,
+          "mtime": 1791436464,
           "size": 1024360
         },
         "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png": {
           "md5": "8fefd17af159857beadd9df19439b2a8",
-          "mtime": 1791402189,
+          "mtime": 1791436464,
           "size": 1117297
         },
         "res://addons/wuifwoud/packs/starter/meshes/CommonTree_4.bin": {
           "md5": "d946bd0db52f16c58c8eb37df32cd837",
-          "mtime": 1721488276,
+          "mtime": 1791436464,
           "size": 307596
         },
         "res://addons/wuifwoud/packs/starter/meshes/CommonTree_4.gltf": {
           "md5": "8b2c80c90dcef8fe235b1c503652e761",
-          "mtime": 1721488276,
+          "mtime": 1791436464,
           "size": 3865
         },
         "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png": {
           "md5": "4761d9780e45a5ae95d02b0138a467c4",
-          "mtime": 1721830306,
+          "mtime": 1791436464,
           "size": 158796
         }
       },
@@ -163,32 +166,33 @@
         "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png": "7256ffdde33f9d884d47fffe4ec9a5f6"
       },
       "pack": "starter.tres",
+      "picture": true,
       "prep_version": 1,
       "settings": "1f2d3c4d786efe239f9d04a1b6f2b581",
       "sources": {
         "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png": {
           "md5": "67b17974d8066394d8e1e25eaa83a6df",
-          "mtime": 1791402187,
+          "mtime": 1791436464,
           "size": 1024360
         },
         "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png": {
           "md5": "8fefd17af159857beadd9df19439b2a8",
-          "mtime": 1791402189,
+          "mtime": 1791436464,
           "size": 1117297
         },
         "res://addons/wuifwoud/packs/starter/meshes/CommonTree_5.bin": {
           "md5": "4fc766a0b88a400a3abc34b2e17ed4e1",
-          "mtime": 1721488264,
+          "mtime": 1791436464,
           "size": 252996
         },
         "res://addons/wuifwoud/packs/starter/meshes/CommonTree_5.gltf": {
           "md5": "839e2f218ad724a151f9b87b6ccfe320",
-          "mtime": 1721488264,
+          "mtime": 1791436464,
           "size": 3860
         },
         "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png": {
           "md5": "4761d9780e45a5ae95d02b0138a467c4",
-          "mtime": 1721830306,
+          "mtime": 1791436464,
           "size": 158796
         }
       },
@@ -212,27 +216,28 @@
         "res://addons/wuifwoud/packs/starter/meshes/DeadTree_4.gltf": "475f445f0d055a89e25827e6644719e8"
       },
       "pack": "starter.tres",
+      "picture": true,
       "prep_version": 1,
       "settings": "14544e48be092059748879d8d96965e9",
       "sources": {
         "res://addons/wuifwoud/packs/starter/meshes/Bark_DeadTree.png": {
           "md5": "831a3149372abb8b290b8b4a6418f2b3",
-          "mtime": 1791402187,
+          "mtime": 1791436464,
           "size": 1105210
         },
         "res://addons/wuifwoud/packs/starter/meshes/Bark_DeadTree_Normal.png": {
           "md5": "32a7c605023312662c09d10315c48ae1",
-          "mtime": 1791402188,
+          "mtime": 1791436464,
           "size": 1450347
         },
         "res://addons/wuifwoud/packs/starter/meshes/DeadTree_4.bin": {
           "md5": "e7dd8c50f9a82329fd0e18e9abff0e72",
-          "mtime": 1721488362,
+          "mtime": 1791436464,
           "size": 401556
         },
         "res://addons/wuifwoud/packs/starter/meshes/DeadTree_4.gltf": {
           "md5": "0e23a5d21034e3c5286543ef5e20b644",
-          "mtime": 1721488362,
+          "mtime": 1791436464,
           "size": 2211
         }
       },
@@ -255,22 +260,23 @@
         "res://addons/wuifwoud/packs/starter/meshes/Leaves.png": "7256ffdde33f9d884d47fffe4ec9a5f6"
       },
       "pack": "starter.tres",
+      "picture": true,
       "prep_version": 1,
       "settings": "31c43529bc5769e10f8d6508a170a9a4",
       "sources": {
         "res://addons/wuifwoud/packs/starter/meshes/Fern_1.bin": {
           "md5": "05decbea32431e32088386b172642d27",
-          "mtime": 1721489572,
+          "mtime": 1791436464,
           "size": 11448
         },
         "res://addons/wuifwoud/packs/starter/meshes/Fern_1.gltf": {
           "md5": "8eeb57d6e4e03920dcdcc1b2e75fca34",
-          "mtime": 1721586514,
+          "mtime": 1791436464,
           "size": 2058
         },
         "res://addons/wuifwoud/packs/starter/meshes/Leaves.png": {
           "md5": "3003dbc8643e5d4a7d51d9d7fd9d1477",
-          "mtime": 1721489688,
+          "mtime": 1791436464,
           "size": 2586432
         }
       },
@@ -295,32 +301,33 @@
         "res://addons/wuifwoud/packs/starter/meshes/Pine_4.gltf": "475f445f0d055a89e25827e6644719e8"
       },
       "pack": "starter.tres",
+      "picture": true,
       "prep_version": 1,
       "settings": "95f2e3eb4e2e23447df93ec73470e0ac",
       "sources": {
         "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png": {
           "md5": "67b17974d8066394d8e1e25eaa83a6df",
-          "mtime": 1791402187,
+          "mtime": 1791436464,
           "size": 1024360
         },
         "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png": {
           "md5": "8fefd17af159857beadd9df19439b2a8",
-          "mtime": 1791402189,
+          "mtime": 1791436464,
           "size": 1117297
         },
         "res://addons/wuifwoud/packs/starter/meshes/Leaf_Pine_C.png": {
           "md5": "8905d00249da052adc37f5504bd19c0a",
-          "mtime": 1721487892,
+          "mtime": 1791436464,
           "size": 70055
         },
         "res://addons/wuifwoud/packs/starter/meshes/Pine_4.bin": {
           "md5": "4b94fb5a4ad53e162605672efc3a3a43",
-          "mtime": 1721487868,
+          "mtime": 1791436464,
           "size": 254844
         },
         "res://addons/wuifwoud/packs/starter/meshes/Pine_4.gltf": {
           "md5": "5666d60260f56e31101ffc9a34ea0c67",
-          "mtime": 1721487868,
+          "mtime": 1791436464,
           "size": 3831
         }
       },
@@ -345,32 +352,33 @@
         "res://addons/wuifwoud/packs/starter/meshes/Pine_5.gltf": "475f445f0d055a89e25827e6644719e8"
       },
       "pack": "starter.tres",
+      "picture": true,
       "prep_version": 1,
       "settings": "95f2e3eb4e2e23447df93ec73470e0ac",
       "sources": {
         "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree.png": {
           "md5": "67b17974d8066394d8e1e25eaa83a6df",
-          "mtime": 1791402187,
+          "mtime": 1791436464,
           "size": 1024360
         },
         "res://addons/wuifwoud/packs/starter/meshes/Bark_NormalTree_Normal.png": {
           "md5": "8fefd17af159857beadd9df19439b2a8",
-          "mtime": 1791402189,
+          "mtime": 1791436464,
           "size": 1117297
         },
         "res://addons/wuifwoud/packs/starter/meshes/Leaf_Pine_C.png": {
           "md5": "8905d00249da052adc37f5504bd19c0a",
-          "mtime": 1721487892,
+          "mtime": 1791436464,
           "size": 70055
         },
         "res://addons/wuifwoud/packs/starter/meshes/Pine_5.bin": {
           "md5": "3948e73cc929c00d66a447615a11c26b",
-          "mtime": 1721487856,
+          "mtime": 1791436464,
           "size": 120996
         },
         "res://addons/wuifwoud/packs/starter/meshes/Pine_5.gltf": {
           "md5": "ad66c61ab4b9e66e42977d53675a883c",
-          "mtime": 1721487856,
+          "mtime": 1791436464,
           "size": 3815
         }
       },
@@ -393,22 +401,23 @@
         "res://addons/wuifwoud/packs/starter/meshes/Plant_1_Big.gltf": "475f445f0d055a89e25827e6644719e8"
       },
       "pack": "starter.tres",
+      "picture": true,
       "prep_version": 1,
       "settings": "31c43529bc5769e10f8d6508a170a9a4",
       "sources": {
         "res://addons/wuifwoud/packs/starter/meshes/Leaves.png": {
           "md5": "3003dbc8643e5d4a7d51d9d7fd9d1477",
-          "mtime": 1721489688,
+          "mtime": 1791436464,
           "size": 2586432
         },
         "res://addons/wuifwoud/packs/starter/meshes/Plant_1_Big.bin": {
           "md5": "696010885e663070ff784eca034e1a7e",
-          "mtime": 1721489678,
+          "mtime": 1791436464,
           "size": 16560
         },
         "res://addons/wuifwoud/packs/starter/meshes/Plant_1_Big.gltf": {
           "md5": "550297447b3085a6fbbb803872d39ff3",
-          "mtime": 1721586588,
+          "mtime": 1791436464,
           "size": 2075
         }
       },
