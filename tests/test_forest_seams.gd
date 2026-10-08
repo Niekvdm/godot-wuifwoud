@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 extends RefCounted
 ## Wuifwoud's own small parts: the ring order (ahead before behind, nearest first, the free radius
-## ignores direction); the Terrain3D lookup by class name with its retry clock; the trunk pool taking its group,
+## ignores direction); the Terrain3D lookup by class name (a sibling's, or one the node sits inside) with its retry clock; the trunk pool taking its group,
 ## layer, mask and metadata from the config; the forest has a sea_level and no canopy switch.
 ##
 ## Run with a unit-suite runner: static run() returns {name, passed, failed, details}.
@@ -61,6 +61,12 @@ static func run() -> Dictionary:
 		host.add_child(t3)
 	Terrain.reset()
 	_chk(r, "Terrain3D found by class name from a sibling's subtree", t3 != null and Terrain.find_cached(host) == t3)
+	var inner := Node3D.new()
+	if t3 != null:
+		t3.add_child(inner)
+	Terrain.reset()
+	_chk(r, "Terrain3D found from inside it (a forest placed as the terrain's child)",
+		t3 != null and Terrain.find_cached(inner) == t3)
 	host.queue_free()
 	await tree.process_frame
 	Terrain.reset()

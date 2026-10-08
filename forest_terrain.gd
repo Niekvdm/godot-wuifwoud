@@ -5,7 +5,8 @@ class_name ForestTerrain
 extends RefCounted
 ## Finding the Terrain3D node and reading its height, for the forest (a copy of the game's terrain lookup, so
 ## the addon needs nothing of the game). Terrain3D is matched by class name, searched outward from a node: each
-## ancestor's subtree, skipping the child subtree already covered, so a full miss visits each node once. A hit is
+## ancestor itself (a forest placed as the terrain's child), then its subtree, skipping the child subtree already
+## covered, so a full miss visits each node once. A hit is
 ## cached until the terrain leaves the tree; a miss is retried on a clock that doubles from 1 s to 8 s, because the
 ## walk is the cost (~2 ms on a big scene) and a terrain-less scene would pay it forever. height_at is NaN without a
 ## terrain or outside the loaded regions: callers treat NaN as "unknown".
@@ -38,11 +39,13 @@ static func find_cached(from: Node) -> Node:
 	return _terrain
 
 
-## The Terrain3D node in `from`'s scene, or null.
+## The Terrain3D node in `from`'s scene, or null: the nearest outward, a terrain `from` sits inside included.
 static func find(from: Node) -> Node:
 	var ancestor: Node = from
 	var covered: Node = null
 	while ancestor != null:
+		if ancestor.get_class() == "Terrain3D":
+			return ancestor
 		var found := _find_below(ancestor, covered)
 		if found != null:
 			return found
