@@ -322,6 +322,27 @@ static func run() -> Dictionary:
 		error_string(ea), error_string(eb)], ea == OK and eb == OK
 		and FileAccess.get_file_as_bytes(pa) == FileAccess.get_file_as_bytes(pb)
 		and FileAccess.get_file_as_bytes(pa).size() < 64 * 64 * 4 and back_s != null and back_s.get_data() == sm.get_data())
+	# ── a map that is compressed or carries mipmaps; the format warning once a map ──
+	var mip := Image.create_empty(64, 64, true, Image.FORMAT_RGBA8)
+	mip.fill(Color8(1, 255, 128, 0))
+	var smip: Dictionary = MapsRes.summarise(mip, Vector2i(0, 0), 64, 64.0, PackedInt32Array([1]))
+	var cmp := Image.create_empty(64, 64, false, Image.FORMAT_RGBA8)
+	cmp.fill(Color8(1, 255, 128, 255))
+	cmp.compress(Image.COMPRESS_S3TC, Image.COMPRESS_SOURCE_GENERIC)
+	var sc: Dictionary = MapsRes.summarise(cmp, Vector2i(0, 0), 64, 64.0, PackedInt32Array([1]))
+	_chk(r, "a mipmapped map is read at its full size, a compressed one decompressed first, each said (%s; %s)" % [
+		str(smip["warn"]), str(sc["warn"])],
+		String(smip["error"]) == "" and (smip["data"] as PackedByteArray).size() == 64 * 64 * 4
+		and String(smip["warn"]).contains("mipmaps") and cmp.is_compressed() and String(sc["error"]) == ""
+		and (sc["data"] as PackedByteArray).size() == 64 * 64 * 4 and String(sc["warn"]).contains("compressed"))
+	var rgb8 := Image.create_empty(64, 64, false, Image.FORMAT_RGB8)
+	var srgb: Dictionary = MapsRes.summarise(rgb8, Vector2i(3, 3), 64, 64.0, PackedInt32Array([1]))
+	var mw = MapsRes.new()
+	var before_w: int = cap.lines.size()
+	mw._hold(Vector2i(3, 3), srgb)
+	mw._hold(Vector2i(3, 3), srgb)
+	var fmt_lines: Array = cap.lines.slice(before_w).filter(func(l): return String(l[1]).contains("is not RGBA8"))
+	_chk(r, "a map's format warning is said once, not at every reload (%d)" % fmt_lines.size(), fmt_lines.size() == 1)
 
 	for f in [p0, p1, p2, pa, pb, pj]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(f))

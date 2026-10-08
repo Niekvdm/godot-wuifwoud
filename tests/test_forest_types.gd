@@ -119,6 +119,13 @@ static func run() -> Dictionary:
 		dressed.get_type(9)["icon"] == "conifer" and dressed.get_type(9)["colour"] == Color.html("#3f7d4c")
 		and not dressed.get_type(2).has("colour") and dressed.errors.size() == 1 and dressed.by_id.size() == 2)
 	_chk(r, "order(): the profile's order; ids() sorted", Array(dressed.order()) == [9, 2] and Array(dressed.ids()) == [2, 9])
+	var no_bush = TypesRes.new()
+	no_bush.load_list([{"id": 4, "name": "Orchard", "style": "grid", "pitch_m": 7.0},
+		{"id": 2, "name": "Scrub", "style": "bushes", "density_per_m2": 0.01}], {"orchard": [["Plum", 1.0]]}, {},
+		func(_n: String) -> bool: return false, func(_n: String) -> bool: return false)
+	_chk(r, "a grid type needs no bush pool (it grows none); a bushes type still does (%s)" % str(no_bush.errors),
+		not no_bush.get_type(4).is_empty() and no_bush.get_type(4)["bush"] == [] and no_bush.get_type(2).is_empty()
+		and no_bush.errors.size() == 1 and String(no_bush.errors[0]).contains("'bush'"))
 	return r
 
 

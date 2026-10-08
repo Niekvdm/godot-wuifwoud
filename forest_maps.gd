@@ -68,6 +68,7 @@ var _summing_at := {}      # Vector2i -> task id
 var _bad := {}             # Vector2i -> true: refused by its checks; no forest there, never asked for again
 var _ever := {}            # Vector2i -> true: held at least once (stats.reloads)
 var _unknown_warned := {}  # type id -> true
+var _format_warned := {}   # map location -> true: what its file needed (a conversion) said once
 var _largest_w := 0        # the widest map held since configure(): what the budget counts in; 0 before any
 ## The editor: maps the Forest tools write. Off in the game.
 var editing := false
@@ -608,9 +609,10 @@ static func texel(p_view: Dictionary, p_region_m: float, x: float, z: float) -> 
 
 ## A map's checks and its block summary, pure (a worker runs it). {"error": "" or why it is no forest, "warn": "",
 ## "w": int, "data": RGBA8 bytes, "blocks": {world block: PackedInt32Array of the `ids` present}, "unknown": ids
-## present that `ids` lacks}. Never converts `src` in place: the threaded loader may share it. The blocks and the unknown
-## ids come from the native core (`core`: a worker's, handed over by the main thread); without it a map has
-## no block (nothing grows: the forest says why, once) but is still held, so the editor can paint and save it.
+## present that `ids` lacks}. A compressed map is decompressed, a mipmapped one loses its mipmaps and another format is
+## converted to RGBA8, each said in `warn`; `src` is never changed in place (the threaded loader may share it). The blocks
+## and the unknown ids come from the native core (`core`: a worker's, handed over by the main thread); without it a map
+## has no block (nothing grows: the forest says why, once) but is still held, so the editor can paint and save it.
 static func summarise(src: Image, loc: Vector2i, p_region_size: int, p_region_m: float,
 		ids: PackedInt32Array, core = null) -> Dictionary:
 	var out := {"error": "", "warn": "", "w": 0, "data": PackedByteArray(), "blocks": {},
@@ -624,10 +626,24 @@ static func summarise(src: Image, loc: Vector2i, p_region_size: int, p_region_m:
 			src.get_width(), src.get_height(), str(ALLOWED_T), p_region_size]
 		return out
 	var img := src
+	var said := PackedStringArray()
+	if img.is_compressed():
+		img = src.duplicate() as Image
+		if img.decompress() != OK:
+			out["error"] = "is compressed (format %d) and does not decompress" % src.get_format()
+			return out
+		said.append("is compressed (format %d): decompressed" % src.get_format())
+	if img.has_mipmaps():
+		if img == src:
+			img = src.duplicate() as Image
+		img.clear_mipmaps()
+		said.append("has mipmaps: dropped")
 	if img.get_format() != Image.FORMAT_RGBA8:
-		img = src.duplicate()
+		if img == src:
+			img = src.duplicate() as Image
+		said.append("is not RGBA8 (format %d): converted" % img.get_format())
 		img.convert(Image.FORMAT_RGBA8)
-		out["warn"] = "is not RGBA8 (format %d): converted" % src.get_format()
+	out["warn"] = "; ".join(said)
 	out["w"] = w
 	out["data"] = img.get_data()
 	var c = core if core != null else ForestNativeRes.core()
@@ -650,7 +666,8 @@ func _summarise_job(job: Dictionary) -> void:
 func _hold(loc: Vector2i, s: Dictionary) -> void:
 	var w := int(s["w"])
 	_largest_w = maxi(_largest_w, w)
-	if String(s["warn"]) != "":
+	if String(s["warn"]) != "" and not _format_warned.has(loc):
+		_format_warned[loc] = true
 		ForestLogRes.warn("[Wuifwoud] forest map %s %s" % [str(loc), s["warn"]])
 	for id in s["unknown"]:
 		if not _unknown_warned.has(id):

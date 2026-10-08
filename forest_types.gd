@@ -134,7 +134,10 @@ func _one(e, species: Dictionary, dead: Dictionary, is_young: Callable, is_matur
 		return {}
 	mixes = drop_species(mixes, disabled)
 	dead_mix = drop_species(dead_mix, disabled)
-	var bush = _lane(mixes, "bush", species, str(d.get("bush_pool", "bush")), label)
+	# A grid grows no bushes: a bush pool it cannot find is no error, its lane stays empty.
+	var bush_name := str(d.get("bush_pool", "bush"))
+	var bush = [] if style == "grid" and not (mixes as Dictionary).has("bush") and not species.has(bush_name) \
+		else _lane(mixes, "bush", species, bush_name, label)
 	if bush == null:
 		return {}
 	t["bush"] = bush

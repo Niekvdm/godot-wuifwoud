@@ -668,9 +668,9 @@ const _TRUNK_CELL := 64.0
 ## trees trunk-for-trunk (the MP contract this file is built on).
 var _quality_density_scale: float = 1.0
 
-var _chunks: Dictionary = {}    # Vector2i -> {pts: [{p: Vector2, kind, seed}], done: bool}
-## Rasterisation jobs on the WorkerThreadPool, one per cell that entered a ring:
-## [{key, cells, entry, rect, polys, bb, pts, wood, task}]. See _scatter_cell.
+var _chunks: Dictionary = {}    # Vector2i -> {pts: [] or a native scatter's packed points ({"n", …}), done, nodes, …}
+## Scatter jobs on the WorkerThreadPool, one per cell that entered a ring: _scatter_job's dictionaries (rect, view,
+## blocks, items, core, tables, roads, params, task, …). See _scatter_cell.
 var _scatter_jobs: Array = []
 ## Placement jobs on the WorkerThreadPool, one per scattered chunk: heights from the
 ## pump's region copies, every gate, species, tint and the packed MultiMesh buffers.
