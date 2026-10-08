@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: MIT
 @tool
 extends RefCounted
-## The Rules tab's right column: the selected rule, its type (the profile's types and No
-## forest; a type the profile lacks shown, so the rule can be moved off it), its match (a line a key; every key must
+## The Rules tab's right column: the selected rule, its type (the profile's types with their icons, in its order, and
+## No forest; a type the profile lacks shown, so the rule can be moved off it), its match (a line a key; every key must
 ## match; ✕ takes a value out), Density and Age, and for points and lines Spacing, Clearance and the species
 ## (written on release), and Delete.
 
@@ -64,7 +64,7 @@ static func _types(d, i: int, ty: int) -> Control:
 		var b: Button = d.kit.toggle_chip(text, id == ty, d.accent)
 		b.name = "Type%d" % id
 		b.button_group = group
-		b.icon = d.swatch(d.type_colour(id))
+		b.icon = d.type_picture(id)
 		if not d.has_type(id):
 			b.add_theme_color_override("font_color", ERROR)
 		var at: int = id

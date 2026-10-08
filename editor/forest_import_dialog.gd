@@ -23,6 +23,8 @@ const ForestMapsRes := preload("res://addons/wuifwoud/forest_maps.gd")
 const ForestTerrainRes := preload("res://addons/wuifwoud/forest_terrain.gd")
 ## The Forest workspace (its type colours).
 const ProviderRes := preload("res://addons/wuifwoud/editor/forest_paint_provider.gd")
+## The type icons.
+const TypeTileRes := preload("res://addons/wuifwoud/editor/common/forest_type_tile.gd")
 ## The Rules tab.
 const RulesTabRes := preload("res://addons/wuifwoud/editor/forest_import_rules_tab.gd")
 ## The Source tab.
@@ -50,6 +52,8 @@ const PANEL_ALPHA := 0.94
 const UX_MODAL_GROUP := &"terrain_3d_ux_modal"
 ## What a change attempted while an import runs says.
 const READ_ONLY := "Read-only while the import runs: that change was not made."
+## A rule row's type icon (px).
+const BADGE_PX := 18
 
 ## ForestMapping; null: no mapping file yet.
 var mapping = null
@@ -69,7 +73,7 @@ var load_error := ""
 var terrain_dir := ""
 ## Where the scene's forest reads its maps.
 var maps_dir := ""
-## [{"id", "name", "colour"}]: the profile's types.
+## [{"id", "name", "colour", "icon"}]: the profile's types, in its order.
 var types: Array = []
 ## The profile's species (the inspector's picker)
 var species: Array = []
@@ -535,6 +539,30 @@ func has_type(id: int) -> bool:
 	return id == 0 or types.any(func(t): return int(t["id"]) == id)
 
 
+## A profile type's icon ("" for No forest or a type the profile lacks; "broadleaf" when its entry names none).
+func type_icon(id: int) -> String:
+	for t in types:
+		if int(t["id"]) == id:
+			return String(t.get("icon", "broadleaf"))
+	return ""
+
+
+## A type's picture on a chip, `px` square: a profile type's icon tile; No forest's and a missing type's colour.
+func type_picture(id: int, px := 16) -> Texture2D:
+	if id == 0 or not has_type(id):
+		return swatch(type_colour(id))
+	return TypeTileRes.texture(type_icon(id), type_colour(id), px)
+
+
+## A type's badge in a row: a profile type's icon tile; No forest's and a missing type's dot.
+func type_badge(id: int) -> Control:
+	if id == 0 or not has_type(id):
+		return dot(type_colour(id))
+	var ic := TypeTileRes.tile(type_icon(id), type_colour(id), BADGE_PX)
+	ic.size_flags_vertical = SIZE_SHRINK_CENTER
+	return ic
+
+
 ## The type a new rule paints: the profile's first.
 func default_type() -> int:
 	return int(types[0]["id"]) if not types.is_empty() else 1
@@ -769,7 +797,7 @@ static func mapping_path(forest: Node) -> String:
 
 ## What the plugin opens the dialog with for the edited scene's forest (null: the scene has none): its mapping file (read
 ## when it exists; a file that cannot be read is named, never replaced), its terrain folder, where its maps are and the
-## profile's types. The plugin adds reader, run, job_of and pick_file.
+## profile's types (in its order, each with its colour and icon). The plugin adds reader, run, job_of and pick_file.
 static func context_for(forest: Node, p_kit: Object) -> Dictionary:
 	var ctx := {"kit": p_kit, "mapping": null, "scene": "", "saved": true, "path": "", "load_error": "",
 		"terrain_dir": "", "maps_dir": "", "types": [], "species": []}
@@ -784,11 +812,10 @@ static func context_for(forest: Node, p_kit: Object) -> Dictionary:
 	var dd = t.get("data_directory") if t != null else null
 	ctx["terrain_dir"] = String(dd) if dd != null else ""
 	ctx["maps_dir"] = String(forest.maps.directory)
-	var ids: Array = Array(forest._types.ids())
-	ids.sort()
-	for id in ids:
-		ctx["types"].append({"id": id, "name": String(forest._types.get_type(id).get("name", "type %d" % id)),
-			"colour": ProviderRes.colour_of(forest._types.get_type(id))})
+	for id in forest._types.order():
+		var ty: Dictionary = forest._types.get_type(id)
+		ctx["types"].append({"id": id, "name": String(ty.get("name", "type %d" % id)), "colour": ProviderRes.colour_of(ty),
+			"icon": TypeTileRes.icon_for(ty)})
 	ctx["species"] = Array(forest.species_names())
 	if ctx["path"] != "" and FileAccess.file_exists(ctx["path"]):
 		var m = MappingRes.new()

@@ -23,6 +23,7 @@ const PROVIDERS := "res://addons/terrain_3d_extended/src/tool_providers.gd"
 const KIT := "res://addons/terrain_3d_extended/src/ux_components.gd"
 const FinderRes := preload("res://addons/wuifwoud/editor/forest_finder.gd")
 const OverlayRes := preload("res://addons/wuifwoud/editor/forest_place_overlay.gd")
+const TypeTileRes := preload("res://addons/wuifwoud/editor/common/forest_type_tile.gd")
 const BAD_DIR := "user://wf_b2c_place_bad"
 const PROFILE_PATH := "user://wf_b2c_place_profile.json"
 const CAT := {
@@ -326,6 +327,11 @@ static func run() -> Dictionary:
 			and box.find_child("Age", true, false) != null and box.find_child("Spacing", true, false) != null
 			and box.find_child("Clearance", true, false) != null and box.find_child("DeleteItem", true, false) != null
 			and box.find_child("RevertItem", true, false) == null and box.find_child("NewSpacing", true, false) != null)
+		var tc1: Button = box.find_child("Type1", true, false)
+		var tc2: Button = box.find_child("Type2", true, false)
+		_chk(r, "the panel's type chips carry the type icons: a natural type of conifers wears the conifer, a grid the orchard",
+			tc1 != null and tc1.icon == TypeTileRes.texture("conifer", TypeTileRes.colour_of(vp._types.get_type(1)), 16)
+			and tc2 != null and tc2.icon == TypeTileRes.texture("orchard", TypeTileRes.colour_of(vp._types.get_type(2)), 16))
 		(box.find_child("Type2", true, false) as Button).pressed.emit()
 		var retyped: Dictionary = vp.trees.items[r77]
 		_chk(r, "a type picked in the panel: one step, the row retyped and the author's; the panel refills, Revert now offered (%s)" % str(retyped["type"]),

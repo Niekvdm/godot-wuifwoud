@@ -180,8 +180,9 @@ static func _on_new(_kind: String, id: String, d) -> void:
 	d.change(func() -> void: d.selected = d.mapping.new_rule_from(k, id, d.default_type()))
 
 
-## A rule's row: its ≡ handle, its type's dot and name, its match, density and age when set, the area it wins (≈). A
-## click selects it; a value dropped on it joins its match; a handle dropped on it moves that rule here.
+## A rule's row: its ≡ handle, its type's icon (a dot for No forest or a type the profile lacks) and name, its match,
+## density and age when set, the area it wins (≈). A click selects it; a value dropped on it joins its match; a handle
+## dropped on it moves that rule here.
 static func _row(d, i: int) -> Control:
 	var r: Dictionary = d.mapping.rules()[i]
 	var ty := int(r.get("type", 0))
@@ -216,7 +217,7 @@ static func _row_body(d, i: int, r: Dictionary, ty: int, handle: Control) -> Con
 	h.add_theme_constant_override("separation", 7)
 	if handle != null:
 		h.add_child(handle)
-	h.add_child(d.dot(d.type_colour(ty)))
+	h.add_child(d.type_badge(ty))
 	var nm := Label.new()
 	nm.name = "Type"
 	nm.text = d.type_name(ty)

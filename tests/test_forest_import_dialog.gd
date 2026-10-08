@@ -5,7 +5,7 @@ extends RefCounted
 ## states (no forest, a scene never saved, no imports_dir, an unreadable mapping file (never offered Start), and no
 ## mapping yet: Start writes one); the shell (the tabs, a change written and undone, Esc); the Source tab (the source
 ## and the terrain folder set, what was read, the texel size, the exclusions, the maps folder note); the rules through
-## the inspector (the type, density on release, a value taken out, a type the profile lacks, Delete); the Run bar (what
+## the inspector (the type and its icon, the rows' type icons, density on release, a value taken out, a type the profile lacks, Delete); the Run bar (what
 ## Run needs, Run, the progress and Cancel (the rules read-only meanwhile), the report, the overwrite question); the
 ## source's values and dragging them onto rules, back, and between rows. The sources listed, added and removed; a
 ## line's value its length, a point's its count; the tiles capped; a rule's spacing, clearance and
@@ -23,6 +23,7 @@ const VA := preload("res://addons/wuifwoud/forest_assets.gd")
 const PackOf := preload("res://addons/wuifwoud/tests/fixtures/pack_of.gd")
 const ForestConfigRes := preload("res://addons/wuifwoud/forest_config.gd")
 const FakeTerrain := preload("res://addons/wuifwoud/tests/fixtures/fake_terrain.gd")
+const TypeTileRes := preload("res://addons/wuifwoud/editor/common/forest_type_tile.gd")
 const PROFILE_PATH := "user://wf_b2b_dialog_profile.json"
 const CAT := {
 	"default_pack": {"mesh_dir": "res://addons/wuifwoud/tests/fake/m/", "ext": ".glb",
@@ -44,6 +45,9 @@ const TERRAIN := "user://wf_b2b_dialog/terrain"
 const TYPES := [{"id": 1, "name": "Forest", "colour": Color(0.2, 0.6, 0.2)},
 	{"id": 2, "name": "Grassland", "colour": Color(0.6, 0.8, 0.3)},
 	{"id": 3, "name": "Park", "colour": Color(0.4, 0.7, 0.5)}]
+const TYPES_ICONS := [{"id": 1, "name": "Forest", "colour": Color(0.2, 0.6, 0.2), "icon": "conifer"},
+	{"id": 2, "name": "Grassland", "colour": Color(0.6, 0.8, 0.3), "icon": "garden"},
+	{"id": 3, "name": "Park", "colour": Color(0.4, 0.7, 0.5), "icon": "broadleaf"}]
 const RULES3 := [{"match": {"kind": ["wood", "forest"]}, "type": 1}, {"match": {"kind": "park"}, "type": 3},
 	{"match": {"kind": "garden", "class": "landuse"}, "type": 2}]
 
@@ -273,6 +277,19 @@ static func run() -> Dictionary:
 		[typed, dens_ok, val_ok, red_ok, (_saved()["rules"] as Array).size(), q.selected]),
 		typed and dens_ok and val_ok and red_ok and (_saved()["rules"] as Array).size() == 3 and q.selected == 2)
 	q.free()
+	# ── type icons: the rule rows and the inspector's type chips ──
+	var ic = b.dialog(_mapping(RULES3 + [{"match": {"kind": "scrub"}, "type": 7}]), {"types": TYPES_ICONS})
+	ic.select(0)
+	var row0: Node = ic.find_child("Rule0", true, false)
+	var row3: Node = ic.find_child("Rule3", true, false)
+	var badge0: TextureRect = (row0.find_child("Icon", true, false) as TextureRect) if row0 != null else null
+	var chip1: Button = ic.find_child("Type1", true, false)
+	var chip0: Button = ic.find_child("Type0", true, false)
+	_chk(r, "type icons: a rule row wears its type's icon tile, a type the profile lacks its dot; the inspector's type chips carry the icons (%s)" % str(badge0.get_meta("icon") if badge0 != null else "none"),
+		badge0 != null and badge0.get_meta("icon") == "conifer" and row3 != null and row3.find_child("Icon", true, false) == null
+		and chip1 != null and chip1.icon == TypeTileRes.texture("conifer", Color(0.2, 0.6, 0.2), 16)
+		and chip0 != null and chip0.icon != null and chip0.icon != chip1.icon)
+	ic.free()
 
 	# ── the Run bar ──
 	var e = b.dialog(_mapping([]))
@@ -444,6 +461,17 @@ static func run() -> Dictionary:
 	_chk(r, "context_for: the profile's species for the inspector; a malformed mapping named by what is wrong, not read (%s)" % c5["load_error"],
 		c5["mapping"] == null and String(c5["load_error"]).contains("'rules' is not a list")
 		and c0["species"] == ["W_Bush", "W_Old"])
+	var rev: Dictionary = PROFILE.duplicate(true)
+	rev["types"] = [PROFILE["types"][1], PROFILE["types"][0]]
+	var rf := FileAccess.open(PROFILE_PATH, FileAccess.WRITE)
+	rf.store_string(JSON.stringify(rev))
+	rf.close()
+	vp._load_profile()
+	var c6: Dictionary = DialogRes.context_for(vp, b.kit)
+	var c6_names: Array = (c6["types"] as Array).map(func(t): return t.get("name", ""))
+	var c6_icons: Array = (c6["types"] as Array).map(func(t): return t.get("icon", ""))
+	_chk(r, "context_for: the types in the profile's order, each with its icon (%s; %s)" % [str(c6_names), str(c6_icons)],
+		c6_names == ["Scrub", "Wood"] and c6_icons == ["bush", "conifer"])
 	vp.free()
 	ft.free()
 	ForestConfigRes.use(null)

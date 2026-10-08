@@ -17,6 +17,10 @@ const ForestLogRes := preload("res://addons/wuifwoud/forest_log.gd")
 const ForestTerrainRes := preload("res://addons/wuifwoud/forest_terrain.gd")
 ## The overlay.
 const OverlayRes := preload("res://addons/wuifwoud/editor/forest_place_overlay.gd")
+## The type icons.
+const TypeTileRes := preload("res://addons/wuifwoud/editor/common/forest_type_tile.gd")
+## A type chip's icon (px).
+const CHIP_ICON_PX := 16
 ## Errors.
 const ERROR := Color("ff8a80")
 ## The Tree tool's id.
@@ -596,12 +600,11 @@ func _selected_section(f: Node, it: Dictionary) -> void:
 	var types := HFlowContainer.new()
 	types.name = "Types"
 	var tg := ButtonGroup.new()
-	var ids: Array = Array(f._types.ids())
-	ids.sort()
-	for id in ids:
-		var b: Button = _kit.toggle_chip(String((f._types.get_type(id) as Dictionary).get("name", "type %d" % id)),
-			int(it["type"]) == int(id), _accent)
+	for id in f._types.order():
+		var t: Dictionary = f._types.get_type(id)
+		var b: Button = _kit.toggle_chip(String(t.get("name", "type %d" % id)), int(it["type"]) == int(id), _accent)
 		b.name = "Type%d" % id
+		b.icon = TypeTileRes.texture(TypeTileRes.icon_for(t), TypeTileRes.colour_of(t), CHIP_ICON_PX)
 		b.button_group = tg
 		var to := int(id)
 		b.pressed.connect(func() -> void: _edit("type", to))
