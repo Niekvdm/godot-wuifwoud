@@ -521,6 +521,25 @@ func tile_menu_action(id: String, item: int) -> void:
 					else String(row["pack"].resource_path))
 
 
+## Field `field` of species `sp` set to `value`: one undo step (its file written). A read-only species changes nothing.
+func set_field(sp, field: String, value) -> void:
+	var row := row_of(String(sp.id))
+	if not row.is_empty() and is_read_only(row["pack"]):
+		return
+	var was = sp.get(field)
+	if typeof(was) == typeof(value) and was == value:
+		return
+	change(func() -> String:
+		sp.set(field, value)
+		return "")
+
+
+## A file (or folder) from the plugin's picker; `on_pick` gets its path.
+func pick(title: String, filters: PackedStringArray, dir: bool, on_pick: Callable) -> void:
+	if pick_file.is_valid():
+		pick_file.call(title, filters, dir, on_pick)
+
+
 ## Select species `id`.
 func select(id: String) -> void:
 	selected = id

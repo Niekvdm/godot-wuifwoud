@@ -909,6 +909,33 @@ static func prepare_species_of(sp) -> Dictionary:
 		"crown_uv": _crown_uv_of(src, foliage), "aabb": (src as ArrayMesh).get_aabb(), "warnings": warnings}
 
 
+## The surfaces of the full-detail mesh in scene `path`: [{"name": its material's name, "foliage": the name rule's
+## verdict (_is_foliage_surface), "albedo" and "normal": its BaseMaterial3D's texture files ("" when none, or one embedded
+## in the scene)}]; [] when the scene has no mesh. MAIN THREAD.
+static func mesh_surfaces(path: String) -> Array:
+	var m = _scene_meshes(path, PackedStringArray())["lod0"]
+	if not (m is ArrayMesh):
+		return []
+	var out := []
+	for si in (m as ArrayMesh).get_surface_count():
+		var mat := (m as ArrayMesh).surface_get_material(si)
+		var albedo := ""
+		var normal := ""
+		if mat is BaseMaterial3D:
+			albedo = _file_of((mat as BaseMaterial3D).albedo_texture)
+			normal = _file_of((mat as BaseMaterial3D).normal_texture)
+		out.append({"name": String(mat.resource_name) if mat != null else "", "foliage": _is_foliage_surface(m, si),
+			"albedo": albedo, "normal": normal})
+	return out
+
+
+static func _file_of(r: Resource) -> String:
+	if r == null:
+		return ""
+	var p := String(r.resource_path)
+	return p if p != "" and not p.contains("::") else ""
+
+
 ## Species `mesh_name` prepared, MAIN THREAD, cached: its pack's built species when built.json lists it at
 ## this PREP_VERSION; else prepared now, its warnings logged, and its pack said once to be unbuilt. {} for a species
 ## no pack has (said once) or whose mesh is missing (said).
