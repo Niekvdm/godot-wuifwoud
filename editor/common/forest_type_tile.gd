@@ -22,6 +22,8 @@ const GLYPHS := {
 const ICONS := ["conifer", "broadleaf", "palm", "bush", "mixed", "orchard", "garden", "dead_wood", "bamboo", "wetland"]
 ## The glyph's share of its tile.
 const GLYPH_SHARE := 0.75
+## The forest's species (a natural type's crowns).
+const VA := preload("res://addons/wuifwoud/forest_assets.gd")
 
 static var _cache := {}
 
@@ -89,6 +91,16 @@ static func icon_of(t: Dictionary, mid: Array, crown_of: Callable) -> String:
 		if crown_of.is_valid() and str(crown_of.call(nm)) == "conifer":
 			con += w
 	return "conifer" if tot > 0.0 and con > tot * 0.5 else "broadleaf"
+
+
+## A resolved type's icon (ForestTypes.get_type): icon_of() with its mid lane, each species' crown read from the
+## forest's packs (one switched off or in no pack counts as no conifer).
+static func icon_for(t: Dictionary) -> String:
+	var bands = t.get("bands", {})
+	var mid: Array = (bands as Dictionary).get("mid", []) if bands is Dictionary else []
+	return icon_of(t, mid, func(id: String) -> String:
+		var sp = VA.species_of(id)
+		return String(sp.crown) if sp != null else "")
 
 
 ## A type's colour by its id alone: a fixed hue per id, the same in every session (the library's colour before types

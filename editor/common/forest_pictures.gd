@@ -3,7 +3,11 @@
 @tool
 extends RefCounted
 ## A species' picture for the editor: its pack build's (built/<id>_picture.res), else its crown's glyph (a broadleaf,
-## conifer or palm tree, or a bush, drawn here from SVG: no import step), loaded once and kept until forget().
+## conifer or palm tree, or a bush, drawn here from SVG: no import step), loaded once and kept until forget(). of_id()
+## asks the forest's packs for the species first.
+
+## The forest's species.
+const VA := preload("res://addons/wuifwoud/forest_assets.gd")
 
 ## The glyphs: white on clear, 24 units square.
 const GLYPHS := {
@@ -45,6 +49,13 @@ static func of(sp, dir: String) -> Texture2D:
 		tex = glyph(glyph_name(sp))
 	_cache[key] = tex
 	return tex
+
+
+## Species `id`'s picture as the forest has it: its pack's (of()), else the broadleaf glyph when it grows nowhere
+## (switched off, or in no pack).
+static func of_id(id: String) -> Texture2D:
+	var sp = VA.species_of(id)
+	return of(sp, VA.built_dir_of(id)) if sp != null else glyph("broadleaf")
 
 
 ## The glyph a species falls back on: "bush" for a bush, else its crown.

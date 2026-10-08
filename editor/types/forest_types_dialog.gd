@@ -586,8 +586,7 @@ func species_why(id: String) -> String:
 
 ## Species `id`'s picture: its build's, else its crown's glyph; a broadleaf glyph when no pack has it.
 func picture_of(id: String) -> Texture2D:
-	var sp = VA.species_of(id)
-	return PicturesRes.of(sp, VA.built_dir_of(id)) if sp != null else PicturesRes.glyph("broadleaf")
+	return PicturesRes.of_id(id)
 
 
 ## Species `sp` added to lane `lane` of the selected row: one undo step.

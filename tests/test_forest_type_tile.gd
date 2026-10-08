@@ -3,11 +3,13 @@
 extends RefCounted
 ## The type icons: ten glyphs, each white on the type's colour in a rounded tile, made once per icon, colour and size;
 ## the tile names its icon; a type's icon (its own, else by style: a natural type's conifer when most of its mid lane
-## by weight is conifer crowns); a type's colour (its own, else today's for its id); ForestAssets.species_of.
+## by weight is conifer crowns); a type's colour (its own, else today's for its id); ForestAssets.species_of; a resolved
+## type's icon with its crowns from the packs; a species' picture by id.
 ##
 ## Run with a unit-suite runner: static run() returns {name, passed, failed, details}.
 
 const TypeTileRes := preload("res://addons/wuifwoud/editor/common/forest_type_tile.gd")
+const PicturesRes := preload("res://addons/wuifwoud/editor/common/forest_pictures.gd")
 const ProviderRes := preload("res://addons/wuifwoud/editor/forest_paint_provider.gd")
 const VA := preload("res://addons/wuifwoud/forest_assets.gd")
 const Fix := preload("res://addons/wuifwoud/tests/fixtures/species_fixture.gd")
@@ -71,6 +73,23 @@ static func run() -> Dictionary:
 	_chk(r, "species_of: a pack's species; null when switched off or in no pack",
 		VA.species_of("W_Bush") != null and String(VA.species_of("W_Bush").kind) == "bush"
 		and VA.species_of("W_Other") == null and VA.species_of("W_Gone") == null)
+	# ── a resolved type's icon, its crowns from the packs ──
+	var sp_new: ForestSpecies = VA.species_of("W_New")
+	sp_new.crown = "conifer"
+	_chk(r, "a resolved type's icon: a natural type's conifer when most of its mid lane by weight is conifer crowns in the packs; a switched-off species counts for nothing",
+		TypeTileRes.icon_for({"style": "natural", "bands": {"mid": [["W_New", 3.0], ["W_Tree", 1.0]]}}) == "conifer"
+		and TypeTileRes.icon_for({"style": "natural", "bands": {"mid": [["W_Other", 3.0], ["W_New", 1.0]]}}) == "broadleaf")
+	sp_new.crown = "broadleaf"
+	_chk(r, "a resolved type's icon: its own; by style; one that is no glyph falls back; a natural type without lanes is broadleaf",
+		TypeTileRes.icon_for({"style": "grid", "icon": "palm"}) == "palm" and TypeTileRes.icon_for({"style": "bushes"}) == "bush"
+		and TypeTileRes.icon_for({"style": "mix", "icon": "rocket"}) == "mixed"
+		and TypeTileRes.icon_for({"style": "natural"}) == "broadleaf")
+	# ── a species' picture by id ──
+	_chk(r, "a species' picture by id: its pack's; the broadleaf glyph when it is switched off or in no pack",
+		PicturesRes.of_id("W_Bush") == PicturesRes.of(VA.species_of("W_Bush"), VA.built_dir_of("W_Bush"))
+		and PicturesRes.of_id("W_Other") == PicturesRes.glyph("broadleaf")
+		and PicturesRes.of_id("W_Gone") == PicturesRes.glyph("broadleaf"))
+	PicturesRes.forget()
 	VA.forget_packs()
 	VA.reset()
 	Fix.TreeFix.rm_tree(ROOT)
