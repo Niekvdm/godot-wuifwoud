@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- A leaf surface's own stem is bark: a mesh that is one surface (a toon palm or tree: trunk and leaves on a material the
+  name rule calls foliage) had its trunk spherified outward from a crown centred above it, the normal pointing down,
+  and the trunk rendered black, lit from the wrong side. The preparation measures the stem (`crown_floor`:
+  `ForestAssets.crown_floor_of`, the run of thin height slices under the crown); `tree_wind` and the impostor bake give
+  the vertices below it no spherify, no crown occlusion and no backlight. The crown and the leaves are unchanged. A pack
+  built before measures it when a species loads (no rebuild needed; its impostor cards keep the old trunk until one).
 - The Species dialog (Forest → Species…, the workspace's ⋯, the inspector): every pack and species as pictures,
   search and filters, species and packs switched on and off, a species' settings, Add species from a mesh, Remove from
   pack, building per species, per pack or all; a live 3D view and Inspect (the model against its impostor card, the

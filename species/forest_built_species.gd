@@ -25,6 +25,9 @@ extends Resource
 @export var crown_radius := 1.0
 ## How far the leaf normals fall short of spherical (the shader's spherify).
 @export var spherify := 0.0
+## The top of the leaf surface's own stem, -1e6 for none (ForestAssets.crown_floor_of); NAN: built before it was
+## (measured when the species loads).
+@export var crown_floor := NAN
 ## The crown's rect in the atlas (u0, v0, u1, v1).
 @export var crown_uv := Vector4(0.0, 0.0, 1.0, 1.0)
 ## The source LOD0's AABB.
@@ -47,6 +50,7 @@ func fill(p_id: String, p: Dictionary, version: int) -> void:
 	crown_centre = p["crown_centre"]
 	crown_radius = p["crown_radius"]
 	spherify = p["spherify"]
+	crown_floor = float(p.get("crown_floor", NAN))
 	crown_uv = p["crown_uv"]
 	aabb = p["aabb"]
 	warnings = PackedStringArray(p.get("warnings", PackedStringArray()))
@@ -63,5 +67,5 @@ func fill(p_id: String, p: Dictionary, version: int) -> void:
 ## The preparation it holds, in prepare_species_of's shape (its own meshes: the forest dresses them).
 func to_prepared() -> Dictionary:
 	return {"combined": combined, "levels": Array(levels), "foliage": foliage, "stamped": stamped,
-		"crown_centre": crown_centre, "crown_radius": crown_radius, "spherify": spherify, "crown_uv": crown_uv,
+		"crown_centre": crown_centre, "crown_radius": crown_radius, "spherify": spherify, "crown_floor": crown_floor, "crown_uv": crown_uv,
 		"aabb": aabb, "warnings": warnings}

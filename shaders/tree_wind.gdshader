@@ -97,6 +97,9 @@ group_uniforms crown;
 uniform vec3 crown_centre = vec3(0.0, 1.0, 0.0);
 uniform float crown_radius = 1.0;
 uniform float spherify : hint_range(0.0, 1.0) = 0.0;
+// The top of a leaf surface's own stem (mesh space; ForestAssets.crown_floor_of): a toon palm is ONE surface, its
+// trunk below this height is bark (no spherify, no crown occlusion, no backlight). -1e6: no stem.
+uniform float crown_floor = -1.0e6;
 // Inner canopy sits behind the leaves outside it. Without this a crown is one flat
 // block of albedo at every depth, which is most of what reads as "bland" next to a
 // terrain carrying strata, contact fringe and per-texel AO.
@@ -227,6 +230,7 @@ uniform float handover_frac : hint_range(0.02, 1.0) = 1.0;
 varying vec4 inst_tint;
 varying flat vec2 band_out;  // this tree's own [out0, out1], from wf_tree_band
 varying float crown_depth;   // 0 at the crown centre, 1 at its outer surface
+varying float leaf_w;        // 1 in the crown, 0 on a leaf surface's own stem (crown_floor)
 varying vec3 shade_pos;      // world XZ/Y for the value break-up
 varying float inst_d;        // instance distance to the MAIN camera, for the crossfades
 
@@ -257,8 +261,9 @@ void vertex() {
 	vec3 from_c = VERTEX - crown_centre;
 	float crown_r = length(from_c);
 	crown_depth = clamp(crown_r / max(crown_radius, 0.001), 0.0, 1.0);
+	leaf_w = smoothstep(crown_floor - 0.5, crown_floor + 0.5, VERTEX.y);
 	if (foliage_mask > 0.5 && spherify > 0.001 && crown_r > 0.001) {
-		NORMAL = normalize(mix(NORMAL, from_c / crown_r, spherify));
+		NORMAL = normalize(mix(NORMAL, from_c / crown_r, spherify * leaf_w));
 	}
 	// ONE world-space transform of the vertex, used for the shading break-up AND
 	// the spatial wind phases (it was computed twice).
@@ -436,7 +441,7 @@ void fragment() {
 	         + sin((shade_pos.x + shade_pos.z) * 1.73 + shade_pos.y * 0.7) * 0.18;
 	float breakup = 1.0 + nz * crown_variation;
 	// Bark takes neither: a trunk is not a canopy and has its own texture already.
-	float shade = mix(1.0, ao * breakup, foliage_mask);
+	float shade = mix(1.0, ao * breakup, foliage_mask * leaf_w);
 
 	ALBEDO = tex.rgb * albedo * tint * shade;
 	ALPHA = tex.a;
@@ -476,5 +481,5 @@ void fragment() {
 		ROUGHNESS = 1.0 - mt.a;
 	}
 	// Thin outer leaves transmit; the packed interior does not.
-	BACKLIGHT = backlight_col * mix(0.35, 1.35, crown_depth) * foliage_mask;
+	BACKLIGHT = backlight_col * mix(0.35, 1.35, crown_depth) * foliage_mask * leaf_w;
 }

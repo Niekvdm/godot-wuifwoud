@@ -101,7 +101,7 @@ static func run() -> Dictionary:
 		same = same and TreeFix.mesh_bytes(p["combined"]) == TreeFix.mesh_bytes(q["combined"]) and (p["levels"] as Array).size() == (q["levels"] as Array).size()
 		for k in (p["levels"] as Array).size():
 			same = same and TreeFix.mesh_bytes(p["levels"][k]) == TreeFix.mesh_bytes(q["levels"][k])
-		for key in ["foliage", "stamped", "crown_centre", "crown_radius", "spherify", "crown_uv", "aabb"]:
+		for key in ["foliage", "stamped", "crown_centre", "crown_radius", "spherify", "crown_floor", "crown_uv", "aabb"]:
 			same = same and p[key] == q[key]
 		same = same and int(back.prep_version) == VA.PREP_VERSION and String(back.id) == pair[0]
 	_chk(r, "a built species loads back as the preparation it saved, byte for byte", same)

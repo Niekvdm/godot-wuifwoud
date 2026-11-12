@@ -70,7 +70,7 @@ static func run() -> Dictionary:
 		if same:
 			for k in (p["levels"] as Array).size():
 				same = same and TreeFix.mesh_bytes(p["levels"][k]) == TreeFix.mesh_bytes(q["levels"][k])
-			for key in ["foliage", "stamped", "crown_centre", "crown_radius", "spherify", "crown_uv", "aabb"]:
+			for key in ["foliage", "stamped", "crown_centre", "crown_radius", "spherify", "crown_floor", "crown_uv", "aabb"]:
 				same = same and p[key] == q[key]
 		if not same:
 			differ.append(id)

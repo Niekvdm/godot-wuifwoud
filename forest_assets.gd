@@ -860,6 +860,64 @@ static func _crown_shape(mesh: ArrayMesh, foliage: PackedInt32Array) -> Dictiona
 		"spherify": clampf(1.0 - authored, 0.0, 1.0)}
 
 
+## No stem: the shaders' crown_floor default (every vertex is crown).
+const NO_STEM := -1.0e6
+const _FLOOR_BINS := 16
+
+
+## The top of a foliage surface's own stem (mesh space), NO_STEM when it has none. A toon palm or tree is ONE surface
+## (trunk and leaves on a material the name rule calls foliage): its trunk then took the crown's terms, the normal
+## spherified outward from a crown centred above it (pointing down, away from the sun: a black trunk lit from the
+## wrong side) and the crown occlusion. The shaders leave a vertex below this height as bark. The crown itself
+## (_crown_shape) is unchanged: the fronds keep their shading. Sixteen height slices of the foliage surfaces, each
+## one's horizontal spread (the larger of its x and z extents); the stem is the run of slices from the bottom under
+## 20 % of the widest (a leaning stem too: its cross-section stays thin), at least 3 of them (15 % of the height). A
+## leaf surface's narrowing bottom (a broadleaf's cap) is no stem. Measured on the TAI palms (one surface each): the
+## stem 7-9 slices of 16 (0.3-1.0 m against fronds of 6-9 m).
+static func crown_floor_of(mesh: ArrayMesh, foliage: PackedInt32Array) -> float:
+	var y0 := INF
+	var y1 := -INF
+	var all: Array = []
+	for si in mesh.get_surface_count():
+		if not foliage.has(si):
+			continue
+		var v = mesh.surface_get_arrays(si)[Mesh.ARRAY_VERTEX]
+		if v == null:
+			continue
+		var vs: PackedVector3Array = v
+		all.append(vs)
+		for i in range(0, vs.size(), maxi(vs.size() / 2400, 1)):
+			y0 = minf(y0, vs[i].y)
+			y1 = maxf(y1, vs[i].y)
+	var hgt := y1 - y0
+	if all.is_empty() or hgt <= 0.01:
+		return NO_STEM
+	var bmin := []
+	var bmax := []
+	for b in _FLOOR_BINS:
+		bmin.append(Vector2(INF, INF))
+		bmax.append(Vector2(-INF, -INF))
+	for vs in all:
+		for i in range(0, (vs as PackedVector3Array).size(), maxi((vs as PackedVector3Array).size() / 2400, 1)):
+			var q: Vector3 = vs[i]
+			var b := clampi(int((q.y - y0) / hgt * _FLOOR_BINS), 0, _FLOOR_BINS - 1)
+			bmin[b] = (bmin[b] as Vector2).min(Vector2(q.x, q.z))
+			bmax[b] = (bmax[b] as Vector2).max(Vector2(q.x, q.z))
+	var spread := PackedFloat32Array()
+	var widest := 0.0
+	for b in _FLOOR_BINS:
+		var d: Vector2 = (bmax[b] as Vector2) - (bmin[b] as Vector2)
+		var w := maxf(d.x, d.y) if (bmin[b] as Vector2).x != INF else 0.0
+		spread.append(w)
+		widest = maxf(widest, w)
+	var c := 0
+	while c < _FLOOR_BINS and spread[c] <= widest * 0.2:
+		c += 1
+	if widest <= 0.0 or c < 3 or c >= _FLOOR_BINS:
+		return NO_STEM
+	return y0 + hgt * float(c) / float(_FLOOR_BINS)
+
+
 ## THE PREPARATION: everything the forest derives from a species' mesh, materials aside.
 ## A pack's build saves it (ForestBuiltSpecies, built/<id>.res); the forest loads that, or prepares here when the pack is
 ## not built. Bump PREP_VERSION whenever what prepare_species_of returns changes: a species built at another version is
@@ -907,12 +965,13 @@ static func prepare_species_of(sp) -> Dictionary:
 	# above is never `src` either).
 	var stamped: bool = mesh != null and not foliage.is_empty() and mesh != src
 	var crown := _crown_shape(mesh, foliage)
+	var floor_y := crown_floor_of(mesh, foliage)
 	var lv := _prepared_levels(id, mesh, chain, foliage)
 	warnings.append_array(lv["warnings"])
 	for si in mesh.get_surface_count():
 		mesh.surface_set_material(si, null)
 	return {"combined": mesh, "levels": lv["levels"], "foliage": foliage, "stamped": stamped,
-		"crown_centre": crown["centre"], "crown_radius": crown["radius"], "spherify": crown["spherify"],
+		"crown_centre": crown["centre"], "crown_radius": crown["radius"], "spherify": crown["spherify"], "crown_floor": floor_y,
 		"crown_uv": _crown_uv_of(src, foliage), "aabb": (src as ArrayMesh).get_aabb(), "warnings": warnings}
 
 
@@ -954,6 +1013,10 @@ static func _prepared(mesh_name: String) -> Dictionary:
 	var b = _built_species(mesh_name)
 	if b != null:
 		p = b.to_prepared()
+		# a pack built before crown_floor (no PREP_VERSION bump: a rebuild is not needed for it): measured at load from
+		# the built combined mesh (one pass over its leaf vertices)
+		if is_nan(float(p.get("crown_floor", NAN))) and p.get("combined") is ArrayMesh:
+			p["crown_floor"] = crown_floor_of(p["combined"], p.get("foliage", PackedInt32Array()))
 	else:
 		var sp = _species_entry(mesh_name)
 		if sp != null:
@@ -1045,6 +1108,7 @@ static func _dress(sp, mesh: ArrayMesh, p: Dictionary, live: bool) -> void:
 		sm.set_shader_parameter("crown_centre", p["crown_centre"])
 		sm.set_shader_parameter("crown_radius", p["crown_radius"])
 		sm.set_shader_parameter("spherify", p["spherify"] if foliage else 0.0)
+		sm.set_shader_parameter("crown_floor", float(p.get("crown_floor", NO_STEM)) if foliage else NO_STEM)
 		mesh.surface_set_material(si, sm)
 		if live:
 			_live_materials.append(sm)

@@ -39,10 +39,13 @@ uniform bool has_mtao = false;
 uniform vec3 crown_centre = vec3(0.0, 1.0, 0.0);
 uniform float crown_radius = 1.0;
 uniform float spherify : hint_range(0.0, 1.0) = 0.0;
+// tree_wind's crown_floor: a leaf surface's own stem below it is bark. -1e6: no stem.
+uniform float crown_floor = -1.0e6;
 uniform float crown_ao : hint_range(0.0, 1.0) = 0.45;
 uniform float foliage_mask = 1.0;
 
 varying float crown_depth;
+varying float leaf_w;
 
 void vertex() {
 	// tree_wind.gdshader's vertex(), minus the wind: crown depth before anything moves,
@@ -50,8 +53,9 @@ void vertex() {
 	vec3 from_c = VERTEX - crown_centre;
 	float crown_r = length(from_c);
 	crown_depth = clamp(crown_r / max(crown_radius, 0.001), 0.0, 1.0);
+	leaf_w = smoothstep(crown_floor - 0.5, crown_floor + 0.5, VERTEX.y);
 	if (foliage_mask > 0.5 && spherify > 0.001 && crown_r > 0.001) {
-		NORMAL = normalize(mix(NORMAL, from_c / crown_r, spherify));
+		NORMAL = normalize(mix(NORMAL, from_c / crown_r, spherify * leaf_w));
 	}
 }
 
@@ -69,7 +73,7 @@ void fragment() {
 		// a tree stands, not of the tree: the card gets its per-instance tint instead).
 		float crown_k = has_mtao ? crown_ao * 0.35 : crown_ao;
 		float ao = mix(1.0 - crown_k, 1.0, crown_depth);
-		float shade = mix(1.0, ao, foliage_mask);
+		float shade = mix(1.0, ao, foliage_mask * leaf_w);
 		ALBEDO = tex.rgb * albedo * shade;
 	} else {
 		// The normal tree_wind lights with. A back face keeps the authored normal (Godot
@@ -92,7 +96,7 @@ void fragment() {
 		n = normalize(n);
 		// Thin outer leaves transmit, the packed interior does not, bark not at all:
 		// tree_wind's BACKLIGHT weight, scaled into 0..1 (the card multiplies by 1.35).
-		float trans = foliage_mask * mix(0.35, 1.35, crown_depth) / 1.35;
+		float trans = foliage_mask * leaf_w * mix(0.35, 1.35, crown_depth) / 1.35;
 		// The view axis is +Z toward the bake camera, so a visible texel's normal has
 		// z >= 0, but a normal map or an authored field can tip one slightly past the
 		// rim, and the 2-channel encoding cannot say so. The runtime rebuilds z as
