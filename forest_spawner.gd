@@ -719,6 +719,13 @@ var _filling := true
 ## (10-21 ms a card arena, 2-5 ms a mesh one); reserved once the fill's cards are drawn, the regrow lands inside
 ## the fill. A mesh arena also starts at ForestIndirect.MESH_MIN_CAP.
 const ARENA_RESERVE_MULT := 3.0
+## The arenas' headroom when a fill ends, this forest's (ARENA_RESERVE_MULT by default): lower holds less GPU memory
+## (the card arenas reserve this times their count), a drive into denser forest then growing an arena in a driving
+## frame (10-21 ms a card arena) when it outgrows it. 2.0 is the growth measured from farmland into a forest.
+@export_range(1.25, 4.0, 0.05) var arena_reserve_mult := ARENA_RESERVE_MULT
+## A mesh arena's starting capacity (instances; ForestIndirect.MESH_MIN_CAP by default, ~0.45 KB of GPU memory an
+## instance): a map whose species are few a cell (6,431 live in 18 mesh arenas on an island) can start lower.
+@export_range(512, 65536, 512) var mesh_arena_min := 8192
 var _reserve_due := false
 ## Cells the ring admitted while driving, waiting for their scatter job: [cells, key, cell_m, bb, entry].
 var _admit_queue: Array = []
@@ -1166,8 +1173,8 @@ func _reserve_after_fill() -> void:
 		return
 	_reserve_due = false
 	if _indirect != null:
-		_indirect.reserve_tier(VegetationIndirectRes.TIER_CARD, ARENA_RESERVE_MULT)
-		_indirect.reserve_tier(VegetationIndirectRes.TIER_MESH, ARENA_RESERVE_MULT)
+		_indirect.reserve_tier(VegetationIndirectRes.TIER_CARD, arena_reserve_mult)
+		_indirect.reserve_tier(VegetationIndirectRes.TIER_MESH, arena_reserve_mult)
 		_indirect.realloc_free_once = true
 
 
@@ -2628,6 +2635,7 @@ func _ensure_indirect() -> void:
 	ind.card_thin_max = card_thin_max
 	ind.card_thin_compensate = card_thin_compensate
 	ind.editor = _editor
+	ind.mesh_min_cap = mesh_arena_min
 	add_child(ind)
 	if not ind.available():
 		# No RenderingDevice (headless), or the cull shader would not load. The

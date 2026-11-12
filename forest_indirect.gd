@@ -67,6 +67,9 @@ const TIER_CARD := 1
 ## (2-5 ms, measured), and no mesh arena grew past 8192 on a drive from farmland into a forest. About 0.45 KB of
 ## GPU memory an instance (the source buffer and one MultiMesh a band).
 const MESH_MIN_CAP := 8192
+## The mesh arenas' starting capacity this forest uses (ForestSpawner.mesh_arena_min; MESH_MIN_CAP by default). A
+## lower start holds less GPU memory where species are few, a growth then costing its 2-5 ms in a driving frame.
+var mesh_min_cap := MESH_MIN_CAP
 ## Floats per instance: Godot's TRANSFORM_3D is 12, plus one four-float attribute (custom data on a mesh tier, the
 ## colour on a card).
 const STRIDE := 16
@@ -341,7 +344,7 @@ func _species(mesh_name: String, tier: int) -> Dictionary:
 	}
 	sp.merge(_arena_state(STRIDE))
 	if sp.has("arena"):
-		sp["arena"].reserve(MESH_MIN_CAP)
+		sp["arena"].reserve(mesh_min_cap)
 	_sp_mx.lock()
 	_sp[key] = sp
 	_sp_mx.unlock()

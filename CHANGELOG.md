@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `ForestSpawner.arena_reserve_mult` (3.0) and `mesh_arena_min` (8192): the GPU arenas' headroom after a fill and
+  a mesh arena's starting capacity, per forest. The defaults are unchanged; a map with few instances a species lowers
+  them for GPU memory (an island: 2.0 and 2048 hold ~90 MB less), a growth then landing in a driving frame.
 - A leaf surface's own stem is bark: a mesh that is one surface (a toon palm or tree: trunk and leaves on a material the
   name rule calls foliage) had its trunk spherified outward from a crown centred above it, the normal pointing down,
   and the trunk rendered black, lit from the wrong side. The preparation measures the stem (`crown_floor`:
