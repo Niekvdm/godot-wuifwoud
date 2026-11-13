@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- The far forest reads as forest, not a shell: where a crown spans a pixel or more across the screen, each pixel's view
+  ray is traced into a layer of crowns hanging from the shell (jittered crowns, cones to domes by `crown_point`,
+  heights varied, kept by the cover): a ray meeting one is shaded by that crown (its flank, its colour, darker lower
+  down), one reaching the layer's floor sees the understorey (or the ground where the cover is open), one skimming the
+  tips is cut, so ridges and skylines show treetops. Past that a second, coarser crown lattice (`clump_k`) carries the
+  colour and the dome; the elevation bands are picked per clump over `band_blend_m` (no ring); a wall darkens toward
+  the ground with a ragged top. The palette's mean is kept (`pom_gain`). Tunables on `forest_far.gdshader`.
 - `ForestSpawner.arena_reserve_mult` (3.0) and `mesh_arena_min` (8192): the GPU arenas' headroom after a fill and
   a mesh arena's starting capacity, per forest. The defaults are unchanged; a map with few instances a species lowers
   them for GPU memory (an island: 2.0 and 2048 hold ~90 MB less), a growth then landing in a driving frame.
