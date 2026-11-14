@@ -274,6 +274,7 @@ Feeders are nodes extending `ForestFeeder`, added under the forest from `ForestC
 | `set_road_segments(segs: PackedFloat64Array)` | The road corridor: 5 floats per segment, `(ax, az, bx, bz, half width)` |
 | `set_push_points(slots: PackedVector4Array)` | Up to 4 vehicles `(x, z, radius, strength)` that push the undergrowth aside |
 | `set_washes(washes: PackedVector4Array)` | Up to 2 rotor downwashes `(x, z, radius, intensity)` |
+| `set_trunk_share(share: Callable)` | Each `collision_group` member's share of the trunk colliders, `ForestTrunkPool.Share`: `PRIMARY` (the default) gets trunks within 45 m and first claim on the 128 colliders; `SECONDARY` (AI traffic, say) trunks within 20 m and only the colliders no primary trunk wants; `NONE` nothing |
 | `ForestLog.sink` | Receives the forest's log lines: `Callable(level, message)` |
 
 Other code finds the forest in the group `wuifwoud_forest`; `crowns_near(p, r)` and `trunks_near(p, r)` return the tree

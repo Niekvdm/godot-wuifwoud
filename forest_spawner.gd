@@ -651,6 +651,8 @@ var _card_cut_pushed: float = -1.0
 ## 320k boxed Vector4 Variants cost ~8x the memory and thrash the cache).
 ## Standing trees only.
 var _trunk_cells: Dictionary = {}
+var _trunk_pool: Node3D = null      # the trunk colliders (tree_collision), once made
+var _trunk_share := Callable()      # set_trunk_share's, handed to the pool when it is made
 ## Tree crowns for rotor strikes (canopies have no collision): per trunk cell, flat
 ## [x, z, y_bottom, y_top, radius], filled wherever a trunk is registered, erased with it.
 var _crown_cells: Dictionary = {}
@@ -883,7 +885,9 @@ func _ready() -> void:
 		pool.trunk_layer = cfg.trunk_layer
 		pool.trunk_mask = cfg.trunk_mask
 		pool.trunk_meta = cfg.trunk_meta
+		pool.member_share = _trunk_share
 		add_child(pool)
+		_trunk_pool = pool
 
 ## Nodes the removed "Spawn in scene" button stored in a scene (named _NAME_PREFIX…, owned by the scene) are freed,
 ## with one warning: the forest grows its own and stores none.
@@ -3178,6 +3182,15 @@ func set_push_points(slots: PackedVector4Array) -> void:
 func set_washes(washes: PackedVector4Array) -> void:
 	_fed_washes = washes if washes.size() <= MAX_WASHES else washes.slice(0, MAX_WASHES)
 
+
+## Each collision group member's share of the trunk colliders (ForestTrunkPool.member_share): a Callable(member:
+## Node3D) -> ForestTrunkPool.Share, say PRIMARY for a player's car, SECONDARY for AI traffic, NONE for a car another
+## peer simulates. An empty Callable: every member PRIMARY. A feeder's _ready may set it before the colliders exist.
+func set_trunk_share(share: Callable) -> void:
+	_trunk_share = share
+	if _trunk_pool != null and is_instance_valid(_trunk_pool):
+		_trunk_pool.member_share = share
+
 func _process(dt: float) -> void:
 	if _editor:
 		_editor_tick()
@@ -3500,15 +3513,18 @@ func crowns_near(p: Vector2, r: float) -> PackedFloat32Array:
 	return out
 
 
-## Trunks within r of p (2D): the collision pool's query. Scans the 3x3
-## trunk-cell neighbourhood (64 m cells vs a ~45 m radius). Returns flat
+## Trunks within r of p (2D): the collision pool's query. Scans only the
+## 64 m trunk cells the disc touches (about six for a 45 m query, three for
+## 20 m), 1 m wider: a trunk is filed by its position before the float32
+## rounding, so one on a cell's edge may sit just past it. Returns flat
 ## [x, ground y, z, radius] quads.
 func trunks_near(p: Vector2, r: float) -> PackedFloat32Array:
 	var out := PackedFloat32Array()
-	var c := Vector2i(int(floor(p.x / _TRUNK_CELL)), int(floor(p.y / _TRUNK_CELL)))
+	var lo := Vector2i(int(floor((p.x - r - 1.0) / _TRUNK_CELL)), int(floor((p.y - r - 1.0) / _TRUNK_CELL)))
+	var hi := Vector2i(int(floor((p.x + r + 1.0) / _TRUNK_CELL)), int(floor((p.y + r + 1.0) / _TRUNK_CELL)))
 	var r2 := r * r
-	for cy in range(c.y - 1, c.y + 2):
-		for cx in range(c.x - 1, c.x + 2):
+	for cy in range(lo.y, hi.y + 1):
+		for cx in range(lo.x, hi.x + 1):
 			var key := Vector2i(cx, cy)
 			if not _trunk_cells.has(key):
 				continue

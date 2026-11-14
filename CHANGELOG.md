@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Trunk collider shares: `ForestSpawner.set_trunk_share(share)` ranks the collision group's members
+  (`ForestTrunkPool.member_share`, a Callable returning `ForestTrunkPool.Share`). A PRIMARY member (every member when
+  unset, as before) keeps the trunks within `radius_m`; a SECONDARY member gets the trunks within `secondary_radius_m`
+  (20 m) and only the colliders no primary trunk wants, a primary trunk taking one back when none is free; a NONE
+  member gets nothing and no longer wakes the move gate. With many AI cars in the group the pool had handed most of
+  its colliders to them, nearest first, and a player's own trunks went without.
+- `trunks_near` scans only the trunk cells its disc touches (about six of nine for a 45 m query, three for 20 m); a
+  radius past 64 m no longer misses trunks.
 - The far forest reads as forest, not a shell: where a crown spans a pixel or more across the screen, each pixel's view
   ray is traced into a layer of crowns hanging from the shell (jittered crowns, cones to domes by `crown_point`,
   heights varied, kept by the cover): a ray meeting one is shaded by that crown (its flank, its colour, darker lower
