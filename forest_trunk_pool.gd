@@ -145,7 +145,9 @@ func _refresh() -> void:
 			_shapes[idx].disabled = true
 			_free_shapes.append(idx)
 			_assigned.erase(k)
-	# New trunks, nearest first, into freed shapes.
+	# New trunks, nearest first, into freed shapes (none free: nothing to place, so no list to build and sort).
+	if _free_shapes.is_empty():
+		return
 	var fresh: Array = []
 	for k in cand:
 		if not _assigned.has(k):

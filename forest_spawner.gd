@@ -1442,6 +1442,7 @@ func _admit(k: Vector2i, cells: Dictionary, cell_m: float, bb_tier: bool) -> voi
 		return
 	var entry := {"pts": [], "done": false, "nodes": [], "admitting": true}
 	cells[k] = entry
+	_open_gen += 1
 	_admit_queue.append([cells, k, cell_m, bb_tier, entry])
 
 
@@ -1577,6 +1578,7 @@ func _collect_scatter(block: bool = false) -> void:
 		var pts = job["pts"]
 		entry["pts"] = pts
 		entry["done"] = point_count(pts) == 0
+		_open_gen += 1
 		entry.erase("scattering")
 		if not bool(job["bb"]):
 			_items_planted += int(job.get("items_n", 0))
@@ -1639,6 +1641,7 @@ func _scatter_map_cell(k: Vector2i, cells: Dictionary, rect: Rect2, bb_tier: boo
 			_scatter_or_empty(k, cells, rect, bb_tier, locs)
 			return
 	cells[k] = {"pts": [], "done": false, "nodes": [], "mapwait": true}
+	_open_gen += 1
 	_map_waiting = true
 
 
@@ -1656,6 +1659,7 @@ func _submit_map_scatter(k: Vector2i, cells: Dictionary, rect: Rect2, bb_tier: b
 		items: Array = []) -> void:
 	var entry := {"pts": [], "done": false, "nodes": [], "scattering": true}
 	cells[k] = entry
+	_open_gen += 1
 	var job := _scatter_job(rect, bb_tier, locs, items)
 	job["key"] = k
 	job["cells"] = cells
@@ -2211,6 +2215,13 @@ func _log_drawable_split() -> void:
 			line.trim_suffix(", ")])
 
 
+## Bumped wherever a cell can become OPEN (not done): admitted, scattered or waiting on maps, a scatter result landing.
+## Every other write to a cell closes or erases it. _resolve_order records, per tier ([mesh chunks, card cells]), the
+## generation at which it last found no open cell, and skips the walk while nothing has opened since.
+var _open_gen := 0
+var _none_open_gen: Array[int] = [-1, -1]
+
+
 ## Unresolved chunks, NEAREST THE CAMERA FIRST.
 ##
 ## This is the change that matters to a player, separately from throughput. The
@@ -2223,10 +2234,17 @@ func _log_drawable_split() -> void:
 ## Recomputed per tick because the camera moves; it is a sort of the OPEN chunks
 ## only, which shrinks as the island resolves.
 func _resolve_order(cells: Dictionary, cell_m: float) -> Array:
+	# Nothing opened since this tier was last found all done: the same empty answer without the walk (two walks of
+	# every cell each tick otherwise, ~0.2 ms a frame once the ring has resolved).
+	var slot := 0 if is_same(cells, _chunks) else (1 if is_same(cells, _bb_cells) else -1)
+	if slot >= 0 and _none_open_gen[slot] == _open_gen:
+		return []
 	var open: Array = []
 	for ck in cells:
 		if not bool((cells[ck] as Dictionary)["done"]):
 			open.append(ck)
+	if open.is_empty() and slot >= 0:
+		_none_open_gen[slot] = _open_gen
 	if open.size() < 2:
 		return open
 	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
@@ -2730,7 +2748,9 @@ func _commit_box_ms() -> float:
 ## reaches right now. Cheap: a few hundred cells, once per resolve tick.
 func _update_mesh_frontier() -> void:
 	var f := INF
-	for k in _chunks:
+	# no open mesh chunk since they were last all found done (_resolve_order's record): the frontier is INF, no walk
+	var walk: bool = _none_open_gen[0] != _open_gen
+	for k in (_chunks if walk else {}):
 		var chunk: Dictionary = _chunks[k]
 		if bool(chunk.get("done", false)):
 			continue
