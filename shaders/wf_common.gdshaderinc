@@ -79,11 +79,13 @@ vec3 wf_cam_pos(mat4 main_cam_inv_view) {
 }
 
 // ── CROSSFADES ──────────────────────────────────────────────────────────────────
-// Every transition in the forest (LOD level to LOD level, last level to impostor
-// card, card to nothing at the far edge) is a COMPLEMENTARY SCREEN-SPACE DITHER
+// Every transition in the forest that fades (last mesh level to impostor card, card to
+// nothing at the far edge, card to the far forest) is a COMPLEMENTARY SCREEN-SPACE DITHER
 // over a distance band: across the band the share of pixels the outgoing draw keeps
 // falls as the share the incoming draw keeps rises, on the same pattern, so every
-// pixel is covered exactly once and TAA/FSR2 resolve the pattern to a true crossfade.
+// pixel is covered exactly once and TAA/FSR2 resolve the pattern to a true crossfade
+// (with the pattern moving every frame: see wf_dither). Mesh LOD levels do not fade:
+// they switch per tree at a jittered distance (wf_cull.glsl).
 // Outside the band the instance is collapsed in the vertex stage and costs nothing;
 // the double draw is confined to the band.
 //
@@ -93,7 +95,19 @@ vec3 wf_cam_pos(mat4 main_cam_inv_view) {
 // pixels drawn twice or not at all. Interleaved gradient noise (Jimenez 2014): no
 // visible tiling at 1:1, and it does not crawl with the camera the way an ordered
 // Bayer pattern does against TAA jitter.
+//
+// A STILL PATTERN IS A STILL SCREEN-DOOR. A temporal filter only turns the pattern into
+// a fade if the pattern changes between the frames it averages: with a fixed one, a
+// still camera hands TAA the same holes every frame and it keeps them, only softened.
+// So while a temporal filter runs (TAA, a temporal upscaler) the pattern moves every
+// frame by Jimenez' own per-frame offset (5.588238 px a frame, 64 frames), and both
+// sides of every pair still read the SAME pattern within a frame, so they stay exact
+// complements. Without one the offset is 0 and the pattern holds still: a moving one
+// with nothing to average it is flicker. ForestSpawner sets the frame
+// (`temporal_dither`); 0 is the still pattern.
+global uniform float wuifwoud_dither_frame;   // 0..63 while a temporal filter runs, else 0
 float wf_dither(vec2 px) {
+	px += 5.588238 * wuifwoud_dither_frame;
 	return fract(52.9829189 * fract(0.06711056 * px.x + 0.00583715 * px.y));
 }
 

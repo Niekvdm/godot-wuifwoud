@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+- Distance stability (a new inspector group): the forest reads its viewport's anti-aliasing every frame (`use_taa`,
+  `scaling_3d_mode`, `msaa_3d`) and adapts, with nothing to feed.
+  - Under a temporal filter (TAA, FSR2, MetalFX temporal) the crossfade dithers move every frame (`temporal_dither`;
+    the global `wuifwoud_dither_frame`, registered at runtime with the wind globals): the filter averages them into a
+    fade where a still pattern stayed a softened screen door on a still camera. Without one they hold still.
+  - Without a temporal filter a tree hands over to its card at its own distance (`handover_frac_native`, 0.02 of the
+    band) instead of dithering over a 27 m sub-band that nothing averages. `handover_frac` (0.3) applies under one.
+  - Each tree's mesh LOD switch distances move by up to ±12 % by its own position (`lod_jitter`, in the cull): no LOD
+    rings travelling with the camera. Only the inner switches move; a tree still ends at its hand-over.
+  - Leaf coverage is kept through the mips (`leaf_mip_alpha`, Golus' scale, as the cards already did), and a thinned
+    crown's kept leaves give back what the thinning dropped (`thin_coverage`), so the crown meets a card about as
+    covered as it is.
+  - Under MSAA, leaf and card edges become per-sample coverage (`msaa_alpha_to_coverage`): both tree shaders carry an
+    `#ifdef WF_A2C` variant (alpha to coverage, the alpha pass), made from the same source and swapped in while MSAA is
+    on; `a2c_depth_write` (WF_A2C_DEPTH) also writes depth per covered sample. Bark stays opaque. Off by default: at
+    MSAA 2x on a forest road it took 2 % off the forest's crawl for up to 1.9 ms of GPU (4.5 ms with the depth write).
+  - While no temporal filter runs (with a narrow `handover_frac_native`) the far forest's dithered choices are made
+    coherent: it comes in under the last cards crown cell by crown cell instead of in a 600 m band of still dither, its
+    crown layer marches with one step offset for every pixel (a ridge's treetops no longer dot the sky through the
+    canopy), and the layer gives way to the clumps at a size instead of pixel by pixel.
+- The far forest costs less for the same picture: its triangles nearer than its hand-over (every pixel dropped there
+  anyway) are put on the eye and not rasterised (`far_near_collapse`), and the crown layer's search tests only the
+  neighbour crowns that can reach a pixel (`far_layer_prune`). `forest_far.gd`'s `SHADER` constant is replaced by
+  `shader()`, loaded once the forest's globals exist.
+- Fix: the impostor cards no longer take the mesh trees' thinning numbers. `push_lod_params` pushed `thin_start_m`
+  and `thin_max` onto every live material, cards included (they share the list and the names), so after a mesh
+  species arrived every card grew as if thinned from 80 m (about 8 % larger at 600 m).
+
 - The height pump's disk fallback no longer keeps every region file it reads. It loaded each with
   `ResourceLoader.load()` inside a WorkerThreadPool task, and in Godot 4.8 such a load is never freed: measured
   headless, ~11-13 MB a 1024² region for the rest of the run (with `CACHE_MODE_REPLACE` one copy a region, up to the

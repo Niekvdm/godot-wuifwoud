@@ -78,7 +78,7 @@ layout(set = 0, binding = 12, std430) restrict buffer Cmd5 { uint c[]; } cmd5;
 // a point known to be inside the frustum on its negative side. So the rule here is
 // always "inside when `dot(n, p) + d >= -r`".
 layout(set = 0, binding = 13, std430) restrict readonly buffer Globals {
-	vec4 cam;         // xyz = MAIN camera position this frame
+	vec4 cam;         // xyz = MAIN camera position this frame; w = the LOD switches' per-tree jitter (lod_key), a share
 	// A SECOND, DELIBERATELY STALE CAMERA, used only for distance THINNING. It jumps in
 	// discrete steps once the real camera has moved far enough (VegetationIndirect
 	// ._globals_bytes). Thinning is a hard per-instance cut with no fade, so against an
@@ -163,6 +163,17 @@ float thin_key(vec3 pos) {
 	uint h = qx * 374761393u + qz * 668265263u;
 	h = (h ^ (h >> 13u)) * 1274126177u;
 	h = h ^ (h >> 16u);
+	return float(h & 0xFFFFFFu) / 16777216.0;
+}
+
+// PER-TREE LOD JITTER: a second deterministic [0, 1) from the same quantised position, mixed differently so it is
+// independent of the thinning key (a tree kept by the thinning is not thereby also a late switcher).
+float lod_key(vec3 pos) {
+	uint qx = uint(int(floor(pos.x * 4.0)) + 1048576);
+	uint qz = uint(int(floor(pos.z * 4.0)) + 1048576);
+	uint h = qx * 2246822519u + qz * 3266489917u;
+	h = (h ^ (h >> 15u)) * 668265263u;
+	h = h ^ (h >> 13u);
 	return float(h & 0xFFFFFFu) / 16777216.0;
 }
 
@@ -358,15 +369,25 @@ void cull_instance(uint i, uint bins, uint cap) {
 		}
 		vec3 pos = vec3(a.w, b.w, c.w);
 		float d = distance(pos, G.cam.xyz);
-		uint bin = uint(MAX_BINS);
+		if (bins == 0u || d < edge(0u) || d >= edge(bins)) {
+			return;   // past the species' cut, or behind the near edge of band 0
+		}
+		// THE SWITCHES MOVE PER TREE. Exact switch distances are rings: every tree changes LOD at the same radius, and
+		// the ring travels with the car (on a forest road, a line of trees popping in step 10, 28 and 77 m ahead). Each
+		// tree takes its own switch distances, its distance scaled by up to +-G.cam.w by its own key, so a stand changes
+		// level tree by tree across the band. ONLY THE INNER EDGES MOVE: the scaled distance is clamped into the
+		// species' range, so a tree still ends at its cut (the hand-over, where tree_wind dithers it out at its true
+		// distance) and starts at band 0's near edge. A single-band tier (the cards) has no inner edge and is unmoved.
+		float dj = d;
+		if (G.cam.w > 0.0 && bins > 1u) {
+			dj = clamp(d * (1.0 + G.cam.w * (2.0 * lod_key(pos) - 1.0)), edge(0u), edge(bins) - 1e-3);
+		}
+		uint bin = bins - 1u;
 		for (uint k = 0u; k < bins; ++k) {
-			if (d >= edge(k) && d < edge(k + 1u)) {
+			if (dj < edge(k + 1u)) {
 				bin = k;
 				break;
 			}
-		}
-		if (bin >= bins) {
-			return;   // past the species' cut, or behind the near edge of band 0
 		}
 		// FRUSTUM CULL: THE HALF THAT MAKES THIS PAY. Without it the per-chunk path
 		// wins on geometry even while losing on draw count: Godot frustum-culls 3 699

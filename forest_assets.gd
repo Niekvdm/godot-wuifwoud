@@ -192,6 +192,9 @@ const WIND_GLOBALS := {
 	"wuifwoud_wind_dir": [RenderingServer.GLOBAL_VAR_TYPE_VEC2, Vector2(1.0, 0.3)],
 	"wuifwoud_wind_strength": [RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0],
 	"wuifwoud_gust_depth": [RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0],
+	# Not wind, but the same kind of per-frame global and the same parse-order rule: the crossfade dither's frame
+	# (wf_common `wf_dither`), 0..63 while a temporal filter runs, else 0 (ForestSpawner `temporal_dither`).
+	"wuifwoud_dither_frame": [RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0],
 }
 
 
@@ -227,6 +230,91 @@ static func _billboard_shader_res() -> Shader:
 		ensure_wind_globals()
 		_billboard_shader = load(_BILLBOARD_SHADER_PATH)
 	return _billboard_shader
+
+
+## ── Alpha to coverage (MSAA) ────────────────────────────────────────────────
+## THE SAME SOURCE WITH ONE DEFINE. Both tree shaders carry an `#ifdef WF_A2C` variant (alpha-to-coverage: leaf and
+## card edges as per-sample coverage, in the alpha pass); a render mode is fixed per shader, so the variant is a second
+## Shader made here from the first's code, never a second file that could drift from it. Swapped onto the materials by
+## set_alpha_to_coverage while the forest's viewport runs MSAA; without MSAA coverage is one sample and buys nothing.
+static var _wind_shader_a2c: Shader = null
+static var _billboard_shader_a2c: Shader = null
+static var _wind_shader_a2cd: Shader = null
+static var _billboard_shader_a2cd: Shader = null
+## Whether the live materials carry the alpha-to-coverage variant (set_alpha_to_coverage), and which: with the depth
+## written per covered sample (WF_A2C_DEPTH) or not.
+static var _a2c_on := false
+static var _a2c_depth := false
+
+
+## `code` with `#define WF_A2C` (and `WF_A2C_DEPTH` when `depth`) after its shader_type line, where a define may go:
+## before the render mode it selects.
+static func a2c_code(code: String, depth := false) -> String:
+	var at := code.find("shader_type")
+	if at < 0:
+		return code
+	var eol := code.find("\n", at)
+	if eol < 0:
+		return code
+	return code.substr(0, eol + 1) + "#define WF_A2C\n" + ("#define WF_A2C_DEPTH\n" if depth else "") \
+		+ code.substr(eol + 1)
+
+
+static func _a2c_variant(base: Shader, depth: bool) -> Shader:
+	var s := Shader.new()
+	s.code = a2c_code(base.code, depth)
+	return s
+
+
+## The alpha-to-coverage variant of the mesh shader (made once each way: `depth`, WF_A2C_DEPTH).
+static func wind_shader_a2c(depth := false) -> Shader:
+	if depth:
+		if _wind_shader_a2cd == null:
+			_wind_shader_a2cd = _a2c_variant(_wind_shader_res(), true)
+		return _wind_shader_a2cd
+	if _wind_shader_a2c == null:
+		_wind_shader_a2c = _a2c_variant(_wind_shader_res(), false)
+	return _wind_shader_a2c
+
+
+## The alpha-to-coverage variant of the card shader (made once each way, as wind_shader_a2c).
+static func billboard_shader_a2c(depth := false) -> Shader:
+	if depth:
+		if _billboard_shader_a2cd == null:
+			_billboard_shader_a2cd = _a2c_variant(_billboard_shader_res(), true)
+		return _billboard_shader_a2cd
+	if _billboard_shader_a2c == null:
+		_billboard_shader_a2c = _a2c_variant(_billboard_shader_res(), false)
+	return _billboard_shader_a2c
+
+
+## A material this file made for an impostor card (card_of marks them): the spawner's mesh-tree pushes skip them.
+static func is_card_material(m: Material) -> bool:
+	return m != null and m.has_meta(&"wf_card")
+
+
+## Every live leaf and card material onto the alpha-to-coverage variant (`on`) or back. Bark stays opaque: it has no
+## cut (alpha_cut 0), so in the alpha pass it would only pay the pass. A ShaderMaterial keeps its parameters across a
+## shader swap (they live on the material, by name), and both variants declare the same ones.
+static func set_alpha_to_coverage(on: bool, depth := false) -> void:
+	_a2c_on = on
+	_a2c_depth = depth
+	for sm in _live_materials:
+		_a2c_apply(sm)
+
+
+static func _a2c_apply(sm) -> void:
+	if not is_instance_valid(sm) or not (sm is ShaderMaterial):
+		return
+	var m := sm as ShaderMaterial
+	if is_card_material(m):
+		var want := billboard_shader_a2c(_a2c_depth) if _a2c_on else _billboard_shader_res()
+		if m.shader != want:
+			m.shader = want
+	elif m.get_shader_parameter("foliage_mask") != null and float(m.get_shader_parameter("foliage_mask")) > 0.5:
+		var want := wind_shader_a2c(_a2c_depth) if _a2c_on else _wind_shader_res()
+		if m.shader != want:
+			m.shader = want
 
 
 ## A bush, by its species' `kind`: one rule, used everywhere. A bush has no card, a short dissolve, and never casts.
@@ -1112,6 +1200,8 @@ static func _dress(sp, mesh: ArrayMesh, p: Dictionary, live: bool) -> void:
 		mesh.surface_set_material(si, sm)
 		if live:
 			_live_materials.append(sm)
+			if _a2c_on:
+				_a2c_apply(sm)
 		if tex == null:
 			ForestLog.warn("[Vegetation] no atlas for %s surface %d: it will render black" % [name, si])
 
@@ -1295,6 +1385,7 @@ static func card_of(id: String, sp, p: Dictionary, ring: Dictionary, profile: in
 	var sm := ShaderMaterial.new()
 	sm.shader = _billboard_shader_res()
 	sm.resource_name = id
+	sm.set_meta(&"wf_card", true)
 
 	# BAKED VIEW RING, when the species' pack is built (its built/ holds the impostor sheets).
 	# The card must span the SAME world square the bake framed, or the tree renders
@@ -1357,6 +1448,8 @@ static func _billboard(mesh_name: String) -> Dictionary:
 	_ensure_packs()
 	var out := card_of(mesh_name, _species.get(mesh_name), p, _impostor_ring(mesh_name), _profile_of(mesh_name))
 	_live_materials.append(out["mat"])
+	if _a2c_on:
+		_a2c_apply(out["mat"])
 	_billboard_cache[mesh_name] = out
 	return out
 

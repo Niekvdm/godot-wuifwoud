@@ -1,7 +1,20 @@
 // Copyright (c) 2026 Digitzone
 // SPDX-License-Identifier: MIT
 shader_type spatial;
+// WF_A2C: the alpha-to-coverage variant, made from this source by ForestAssets (a `#define WF_A2C` after the line
+// above) and swapped in while the viewport runs MSAA (ForestSpawner `msaa_alpha_to_coverage`). Leaf edges become
+// per-sample coverage instead of a per-pixel cut, so MSAA smooths them; the material moves to the alpha pass (still
+// with its depth prepass, which holds the leaves' solid middles, and its shadow). `_and_one`: a covered sample takes
+// the leaf's colour outright rather than blending it a second time (the coverage already IS the alpha).
+// WF_A2C_DEPTH as well (ForestSpawner `a2c_depth_write`): depth written per covered sample too, so overlapping leaf
+// EDGES keep their order; without it they land in draw order, and the pass keeps its early depth test (the cheaper).
+#if defined(WF_A2C) && defined(WF_A2C_DEPTH)
+render_mode cull_disabled, diffuse_burley, specular_disabled, depth_prepass_alpha, depth_draw_always, alpha_to_coverage_and_one;
+#elif defined(WF_A2C)
+render_mode cull_disabled, diffuse_burley, specular_disabled, depth_prepass_alpha, alpha_to_coverage_and_one;
+#else
 render_mode cull_disabled, diffuse_burley, specular_disabled, depth_prepass_alpha;
+#endif
 // Foliage wind for MultiMesh-instanced trees/bushes.
 //
 // Height-weighted canopy sway (trunk stays planted), per-instance phase from the
@@ -227,12 +240,28 @@ uniform float lod_out1 = 350.0;
 // in one step is a pop rather than a dissolve.
 uniform float handover_frac : hint_range(0.02, 1.0) = 1.0;
 
+group_uniforms coverage;
+// COVERAGE KEPT THROUGH THE MIPS. A mip averages alpha, so a crown of thin leaves loses ever more texels to the cut as
+// it shrinks on screen: at 100-200 m a crown reads sparser than the impostor that takes it over, which was baked from
+// the full-resolution leaves, and the hand-over shows it. Scaling alpha up with the mip level sampled holds the covered
+// share roughly constant (B. Golus, "Anti-aliased Alpha Test", 2017): the impostor card's `alpha_mip_scale`, at the
+// same 0.25, so both sides of the hand-over keep coverage the same way. 0 = plain mips. (The alpha-to-coverage variant
+// leaves this to the engine, whose edge applies the same 0.25.)
+uniform float leaf_mip_scale : hint_range(0.0, 1.0) = 0.25;
+// THINNED CROWNS KEEP THEIR COVERAGE. Past `thin_start_m` a crown draws only `keep` of its cards (the LOD block above),
+// and the impostor at the hand-over was baked from all of them: a crown down to 40 % of its cards meets a card baked
+// from 100 %, and the screen door between them shows the difference. The survivors' alpha is raised by 1 / keep, which
+// at the mips these distances sample spreads each kept card over more of its quad: the same coverage from fewer cards,
+// as far as a card's own quad allows (the impostor's `thin_compensate` grows its cards for the same reason). 0 = off.
+uniform float thin_coverage : hint_range(0.0, 1.0) = 1.0;
+
 varying vec4 inst_tint;
 varying flat vec2 band_out;  // this tree's own [out0, out1], from wf_tree_band
 varying float crown_depth;   // 0 at the crown centre, 1 at its outer surface
 varying float leaf_w;        // 1 in the crown, 0 on a leaf surface's own stem (crown_floor)
 varying vec3 shade_pos;      // world XZ/Y for the value break-up
 varying float inst_d;        // instance distance to the MAIN camera, for the crossfades
+varying flat float inst_keep; // the share of this crown's cards drawn (1 where nothing is thinned)
 
 void vertex() {
 	inst_tint = INSTANCE_CUSTOM;
@@ -251,7 +280,9 @@ void vertex() {
 	// Per INSTANCE, not per vertex: one tree's kept share is one number, so every
 	// vertex of a card sees the same threshold and the card collapses whole.
 	float thin_keep = 1.0 - thin_max * smoothstep(thin_start_m, thin_end_m, cam_d);
-	culled = culled || (cards_stamped && foliage_mask > 0.5 && COLOR.r > thin_keep);
+	bool thinned = cards_stamped && foliage_mask > 0.5;
+	inst_keep = thinned ? thin_keep : 1.0;
+	culled = culled || (thinned && COLOR.r > thin_keep);
 	if (culled) {
 		// Every vertex on the instance origin: no area, nothing rasterised.
 		VERTEX = vec3(0.0);
@@ -444,8 +475,21 @@ void fragment() {
 	float shade = mix(1.0, ao * breakup, foliage_mask * leaf_w);
 
 	ALBEDO = tex.rgb * albedo * tint * shade;
-	ALPHA = tex.a;
+	// Coverage (the `coverage` block): the thinned share given back, then the mips' (here, or the engine's edge).
+	float cover_k = 1.0 / mix(1.0, max(inst_keep, 0.05), thin_coverage);
+	float mip_k = 1.0 + max(textureQueryLod(albedo_tex, UV).y, 0.0) * leaf_mip_scale;
+#ifdef WF_A2C
+	// Nothing under half the edge can reach a sample: dropped before the lighting, as the scissor would.
+	if (tex.a * cover_k * mip_k < alpha_cut * 0.5) {
+		discard;
+	}
+	ALPHA = tex.a * cover_k;
+	ALPHA_ANTIALIASING_EDGE = alpha_cut;
+	ALPHA_TEXTURE_COORDINATE = UV * vec2(textureSize(albedo_tex, 0));
+#else
+	ALPHA = tex.a * cover_k * mip_k;
 	ALPHA_SCISSOR_THRESHOLD = alpha_cut;
+#endif
 	ROUGHNESS = roughness;
 	if (has_normal) {
 		NORMAL_MAP = texture(normal_tex, UV).rgb;

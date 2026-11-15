@@ -65,6 +65,28 @@ uniform float pom_reach = 9.0;          // the furthest a ray is followed, in tr
 // Diagnostics (tools; 0 in play), flat emitted colours no natural pixel has: 1 the canopy magenta and the walls red, cut
 // as drawn; 2 the same with no cut at all (the whole mesh: where the shell stands, whatever its cover and the handover).
 uniform int debug_mode = 0;
+// THE COST SWITCHES (ForestSpawner far_near_collapse / far_layer_prune), each the same picture for less work.
+// NEAR COLLAPSE: every pixel nearer than the handover's start is dropped (the first test in fragment()), yet a cell is
+// 4 km across, so the shell around the camera was rasterised (the canopy over a forest road fills half the screen) only
+// to be dropped pixel by pixel, in the depth prepass too. A vertex all of whose triangles lie nearer than that start is
+// put on the camera instead: a triangle through the eye projects to a line and draws nothing. "All of its triangles" is
+// bounded, not known: a triangle reaches at most `tri_reach_m` across the ground from any of its vertices, and between
+// `y_span` (the cell's mesh, walls included) in height.
+uniform bool near_collapse = true;
+uniform vec2 y_span = vec2(-1.0e6, 1.0e6);
+uniform float tri_reach_m = 64.0;
+// LAYER PRUNE: the crown layer's search (far_layer) tests only the neighbour cells whose crowns can reach the point.
+uniform bool layer_prune = true;
+// STILL MODE (ForestSpawner, while no temporal filter runs). Three of the shell's choices are made per pixel on a
+// dither so that a temporal filter averages them into a blend; with none, each is a still pattern, and at a ridge
+// (the skyline) it reads as sky dotted through the canopy. In still mode they are coherent instead:
+//   the hand-over under the last cards goes crown cell by crown cell, each at its own distance in the band (as the
+//   trees switch per tree), not a screen door 600 m deep;
+//   the crown layer's march takes the same step offset at every pixel (the middle of each step), so a ray skimming
+//   the treetops hits or misses with its neighbours, not on a pattern;
+//   the layer gives way to the clumps at a size (pom_w one half), not pixel by pixel across a band.
+// The cover past the crowns (sub-pixel) keeps its dither: a choice anchored in the world there would crawl in motion.
+uniform bool still_mode = false;
 
 varying vec3 wpos;
 varying float vdist;
@@ -125,13 +147,31 @@ float far_layer(vec2 p, float spacing, float depth, float cover, out vec2 cid, o
 	float best = 0.0;
 	cid = ip;
 	rel = vec2(1.0);
-	for (int j = -1; j <= 1; j++) {
-		for (int i = -1; i <= 1; i++) {
+	// WHICH NEIGHBOURS CAN REACH p (layer_prune). A crown's centre lies in [0.1, 0.9] of its cell and its radius is at
+	// most crown_r * 1.2 cells, so the cell to the left reaches into this one only below that radius minus 0.1, the cell
+	// to the right only above 1.1 minus it; a neighbour that cannot reach p would be skipped by the radius test below
+	// anyway, so leaving it out is the same answer, in the same order. The same bound rejects a crown before its radius
+	// is drawn.
+	ivec2 lo = ivec2(-1);
+	ivec2 hi = ivec2(1);
+	float rr = crown_r * 1.2 + 1.0e-3;
+	float rr_m2 = 1.0e30;
+	if (layer_prune) {
+		vec2 fp = p / spacing - ip;
+		lo = ivec2(fp.x < rr - 0.1 ? -1 : 0, fp.y < rr - 0.1 ? -1 : 0);
+		hi = ivec2(fp.x > 1.1 - rr ? 1 : 0, fp.y > 1.1 - rr ? 1 : 0);
+		rr_m2 = rr * rr * spacing * spacing;
+	}
+	for (int j = lo.y; j <= hi.y; j++) {
+		for (int i = lo.x; i <= hi.x; i++) {
 			vec2 c = ip + vec2(float(i), float(j));
 			if (far_h12(c) >= cover) {
 				continue;
 			}
 			vec2 r = p - (c + far_h22(c) * 0.8 + 0.1) * spacing;
+			if (dot(r, r) >= rr_m2) {
+				continue;
+			}
 			float rad = spacing * crown_r * (0.8 + 0.4 * far_h12(c + 9.7));
 			float x = length(r) / rad;
 			if (x >= 1.0) {
@@ -154,6 +194,18 @@ void vertex() {
 	vdist = distance(wpos, vcam);
 	cust = CUSTOM0.xyz;
 	vtype = CUSTOM0.w;
+	// NEAR COLLAPSE (the uniform's note): every point of every triangle on this vertex lies within the ground reach and
+	// the height span, so its distance is under sqrt(h^2 + dy^2); under the handover's start all of it is dropped.
+	float near_lo = far_cut - fade_m;
+	if (near_collapse && debug_mode != 2 && near_lo > 0.0) {
+		float h = length(wpos.xz - vcam.xz) + tri_reach_m;
+		float dy = max(abs(y_span.y - vcam.y), abs(vcam.y - y_span.x));
+		if (h * h + dy * dy < near_lo * near_lo) {
+			// onto THIS pass's eye (the one it projects through), in the mesh's own space
+			VERTEX = (inverse(MODEL_MATRIX) * vec4(INV_VIEW_MATRIX[3].xyz, 1.0)).xyz;
+			vdist = 0.0;
+		}
+	}
 }
 
 void fragment() {
@@ -163,7 +215,8 @@ void fragment() {
 		EMISSION = wall ? vec3(1.0, 0.0, 0.0) : vec3(1.0, 0.0, 1.0);
 		ROUGHNESS = 1.0;
 	} else {
-		if (wf_dither(FRAGCOORD.xy) >= wf_band(far_cut - fade_m, far_cut, vdist)) {
+		float hand_w = wf_band(far_cut - fade_m, far_cut, vdist);
+		if (wf_dither(FRAGCOORD.xy) >= hand_w && !(still_mode && hand_w > 0.0)) {
 			discard;
 		}
 		vec2 uv = (wpos.xz - cell_origin) / cell_size;
@@ -179,12 +232,14 @@ void fragment() {
 		// the spacing is the band's; read at the middle band first, then the crown's own band below
 		float spacing = max(texelFetch(palette, ivec2(8, ty * 3 + 1), 0).a, 1.0);
 		vec2 gp = wpos.xz / spacing;
+		// the crown cell's own place in the band (still_mode; the shared dither above otherwise)
+		if (still_mode && far_h12(floor(gp) + 71.3) >= hand_w) {
+			discard;
+		}
 		vec2 cp = gp / clump_k;
-		vec4 crown = far_crown(gp);
 		vec4 clump = far_crown(cp);
 		float far_w = smoothstep(0.25, 0.5, length(fwidth(gp)));   // 1 where a crown spans under about 2 pixels
 		float clump_w = smoothstep(0.25, 0.5, length(fwidth(cp)));  // and a clump
-		float rim = clamp(length(crown.zw) / 0.7, 0.0, 1.0);
 		float crim = clamp(length(clump.zw) / 0.7, 0.0, 1.0);
 		// the band by the crown's (or clump's) own jittered height: blended, not a ring
 		float hj = cust.z + (far_h12(clump.xy + 7.3) - 0.5) * 2.0 * band_blend_m;
@@ -199,11 +254,12 @@ void fragment() {
 		// the crown layer where a crown spans more than about a pixel ACROSS the screen (dithered into the clumps past
 		// that): the smaller derivative, as a grazing view foreshortens the other and the layer is what draws it right
 		float pom_w = 1.0 - smoothstep(0.6, 1.1, min(length(dFdx(gp)), length(dFdy(gp))));
-		bool pom = !wall && geo.y > 0.25 && down > 0.0 && wf_dither(FRAGCOORD.xy + vec2(41.0, 7.0)) < pom_w;
+		bool pom = !wall && geo.y > 0.25 && down > 0.0
+			&& (still_mode ? pom_w >= 0.5 : wf_dither(FRAGCOORD.xy + vec2(41.0, 7.0)) < pom_w);
 		if (pom) {
 			float dep_m = crown_depth_k * spacing;
 			float reach = min(dep_m / max(down, 1e-4), pom_reach * spacing);
-			float jit = wf_dither(FRAGCOORD.xy + vec2(5.0, 11.0));
+			float jit = still_mode ? 0.5 : wf_dither(FRAGCOORD.xy + vec2(5.0, 11.0));
 			vec3 rd = -vw;
 			bool hit = false;
 			vec2 cid = vec2(0.0);
@@ -234,7 +290,10 @@ void fragment() {
 				nw = normalize(geo + vec3(dir.x, 0.0, dir.y) * g);
 			}
 		} else {
-			// past the crown layer: the clumps (L1), edge-on the gaps between them cut away
+			// past the crown layer: the clumps (L1), edge-on the gaps between them cut away. The nearest single crown is
+			// only wanted here (the layer has its own), so only looked for here.
+			vec4 crown = far_crown(gp);
+			float rim = clamp(length(crown.zw) / 0.7, 0.0, 1.0);
 			float graze = smoothstep(graze_lo, graze_hi, 1.0 - abs(dot(geo, vw)));
 			float edge_rim = mix(rim, crim, far_w);
 			float own = mix(far_h12(crown.xy), wf_dither(FRAGCOORD.xy + vec2(17.0, 31.0)), far_w);

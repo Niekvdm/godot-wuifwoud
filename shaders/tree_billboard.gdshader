@@ -8,7 +8,16 @@ shader_type spatial;
 // lift lives in `card_pivot_h`), so each card would be lit on a square half underground and
 // turned by the instance basis, its lower half sampling the terrain's shadow from below
 // ground out to the sun's full shadow distance ("billboard shading looks off in direct sun").
+// WF_A2C: the alpha-to-coverage variant (tree_wind.gdshader says how it is made and why), swapped in while the viewport
+// runs MSAA: the card's cut becomes per-sample coverage, in the alpha pass (WF_A2C_DEPTH: depth written per covered
+// sample as well).
+#if defined(WF_A2C) && defined(WF_A2C_DEPTH)
+render_mode cull_disabled, specular_disabled, skip_vertex_transform, depth_draw_always, alpha_to_coverage_and_one;
+#elif defined(WF_A2C)
+render_mode cull_disabled, specular_disabled, skip_vertex_transform, alpha_to_coverage_and_one;
+#else
 render_mode cull_disabled, specular_disabled, skip_vertex_transform;
+#endif
 // Distant-tree impostor: a camera-facing card, one quad per far tree,
 // MultiMesh-instanced, crossfaded in from the 3D mesh at its visibility edge.
 // The canopy sways with the shared wind uniforms.
@@ -330,6 +339,10 @@ void fragment() {
 	bool gbuf = has_ring > 0.5 && impostor_gbuffer;
 	vec3 gb_n = vec3(0.0);
 	float gb_trans = 0.0;
+#ifdef WF_A2C
+	float a_raw = 1.0;          // the coverage before the mip scale (the alpha-to-coverage variant's ALPHA)
+	vec2 aa_uv = sil;           // and the texel coordinate its edge is measured in
+#endif
 
 	if (gbuf) {
 		// THE G-BUFFER BAKE. Same grid, same three taps and weights as the sheet below,
@@ -348,6 +361,10 @@ void fragment() {
 		a = pm.a;
 		if (a < 0.004) discard;
 		col = wf_srgb_to_linear(clamp(pm.rgb / a, 0.0, 1.0));
+#ifdef WF_A2C
+		a_raw = a;
+		aa_uv = ua * vec2(textureSize(impostor_albedo, 0));
+#endif
 		a *= 1.0 + max(textureQueryLod(impostor_albedo, ua).y, 0.0) * alpha_mip_scale;
 		vec4 na = texture(impostor_normal, ua);
 		vec4 nb = texture(impostor_normal, ub);
@@ -380,6 +397,10 @@ void fragment() {
 		vec4 tx = ta * tile_w.x + tb * tile_w.y + tc * tile_w.z;
 		col = tx.rgb;
 		a = tx.a;
+#ifdef WF_A2C
+		a_raw = a;
+		aa_uv = (tile_a + tuv) / grid * vec2(textureSize(impostor_tex, 0));
+#endif
 	} else {
 		// FALLBACK: no bake for this species. A procedural silhouette washed with the
 		// crown rect.
@@ -403,6 +424,10 @@ void fragment() {
 			if (dot(c, c) < 1.0) a = 1.0;
 		}
 		col = mix(foliage, trunk, is_trunk);
+#ifdef WF_A2C
+		a_raw = a;
+		aa_uv = sil * 64.0;
+#endif
 		float rw = crown_uv.z - crown_uv.x;
 		float rh = crown_uv.w - crown_uv.y;
 		if (is_trunk < 0.5 && rw > 0.001 && rh > 0.001) {
@@ -413,7 +438,16 @@ void fragment() {
 		}
 	}
 
+#ifdef WF_A2C
+	// The edge decides coverage (the engine applies the same mip scale to `a_raw`); nothing under half of it can
+	// reach a sample, so it goes before the lighting, as the cut would.
+	if (a < alpha_cut * 0.5) discard;
+	ALPHA = a_raw;
+	ALPHA_ANTIALIASING_EDGE = alpha_cut;
+	ALPHA_TEXTURE_COORDINATE = aa_uv;
+#else
 	if (a < alpha_cut) discard;
+#endif
 	// CROSSFADE EDGES, on the shared pattern and on THIS TREE's sub-bands. Near: the
 	// card keeps the pixels the last mesh level drops (`dth < w`, the mesh keeps
 	// `dth >= w`, same `w`, same band). Far: the field dissolves into the haze rather
@@ -424,9 +458,10 @@ void fragment() {
 			&& dth < wf_band(far_band.x, far_band.y, vdist)) discard;
 	if (dth < px_gone) discard;
 
-	// ALPHA IS DELIBERATELY NOT WRITTEN, on either path. Assigning it at all puts the
-	// material on the transparent pipeline, which would sort every impostor card on the
-	// island per frame; the cutout is done with discard precisely to stay opaque.
+	// ALPHA IS NOT WRITTEN, on either path (but the alpha-to-coverage variant's, above). Assigning it at all puts the
+	// material on the transparent pipeline: drawn after the opaque pass, sorted per band instance (one per species,
+	// not per card), blended at its edges, with the colour pass testing LESS_OR_EQUAL instead of EQUAL. Without MSAA
+	// none of that buys anything, so the cutout is a discard and the card stays opaque.
 	ROUGHNESS = 0.95;
 	if (gbuf) {
 		// The mesh's own terms, per texel: the normal it is lit with (tree space -> this

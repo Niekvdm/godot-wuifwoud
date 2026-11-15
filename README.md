@@ -59,8 +59,9 @@ A `ForestConfig` resource at `res://wuifwoud_config.tres` (or at the path in the
 | `trunk_layer`, `trunk_mask` | The trunk colliders' physics layer and mask |
 | `trunk_meta` | Metadata set on the trunk colliders' body |
 
-The `ForestSpawner` node's settings are grouped in the inspector (Forest, Trees, Bushes, Impostor cards, Far forest,
-Roads, Wind and vehicles, Ground clutter, Streaming, Performance); each tooltip gives the unit and what 0 means.
+The `ForestSpawner` node's settings are grouped in the inspector (Forest, Trees, Distance stability, Bushes, Impostor
+cards, Far forest, Roads, Wind and vehicles, Ground clutter, Streaming, Performance); each tooltip gives the unit and
+what 0 means.
 
 ## Forest maps
 
@@ -215,6 +216,31 @@ per far cell, coloured from the species' impostor bakes.
 | `far_cell_regions` | 4 | regions per far cell, each way |
 | `far_grid_m` | 16 | the shell's quad size (divides the region) |
 | `far_texel_m` | 8 | the summary's texel size (divides `far_grid_m`) |
+| `far_near_collapse` | true | the shell's triangles nearer than its hand-over are not rasterised (they draw nothing) |
+| `far_layer_prune` | true | the crown layer tests only the neighbour crowns that can reach a pixel (the same picture) |
+
+## Distance stability
+
+A distant forest shimmers where a pixel changes its mind between frames: a crossfade's dither, a leaf's cut edge, a LOD
+level switching. The forest reads its viewport's anti-aliasing every frame (`use_taa`, `scaling_3d_mode`, `msaa_3d`)
+and adapts; nothing outside has to tell it.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `temporal_dither` | true | while TAA or a temporal upscaler (FSR2, MetalFX temporal) runs, the crossfade dithers move every frame, so the filter averages them into a fade; without one they hold still |
+| `handover_frac_native` | 0.02 | without a temporal filter, the share of the hand-over band one tree's crossfade takes: by default a tree switches to its card at its own distance instead of dithering (`handover_frac` is the share with one) |
+| `lod_jitter` | 0.12 | each tree's mesh LOD switch distances move by up to this share either way, so a stand changes level tree by tree, not on rings around the camera |
+| `leaf_mip_alpha` | 0.25 | leaf alpha raised with the mip level sampled, so a crown keeps its covered share as it shrinks (as the impostor cards do) |
+| `thin_coverage` | 1.0 | how much of the coverage the distance thinning (`foliage_thin_max`) drops the kept leaves give back, so a thinned crown covers about what its card does at the hand-over |
+| `msaa_alpha_to_coverage` | false | while MSAA is on, leaf and card edges become per-sample coverage (alpha to coverage), which MSAA smooths; the materials then draw in the alpha pass, which costs GPU (measured at MSAA 2x on a forest road: up to 1.9 ms, for 2 % less crawl) |
+| `a2c_depth_write` | false | alpha to coverage also writes depth per covered sample (overlapping leaf edges keep their order; costs the alpha pass its early depth test) |
+
+Without a temporal filter and with a narrow `handover_frac_native`, the far forest's dithered choices are made
+coherent too: it comes in under the last cards crown cell by crown cell, its crown layer marches with one step offset
+for every pixel, and the layer gives way to the clumps at a size rather than pixel by pixel.
+
+The crossfade dithers read the global shader uniform `wuifwoud_dither_frame` (0..63 under a temporal filter, else 0),
+registered at runtime with the wind globals when the project does not declare it.
 
 ## Species packs
 

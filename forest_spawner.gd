@@ -205,6 +205,64 @@ const GROUP := &"wuifwoud_forest"
 ## Trunk colliders around whatever moves (the config's collision group).
 @export var tree_collision: bool = true
 
+@export_group("Distance stability")
+
+# WHAT KEEPS A DISTANT FOREST STILL, by anti-aliasing. The forest reads its viewport every frame (use_taa,
+# scaling_3d_mode, msaa_3d) and switches itself; nothing outside has to tell it.
+#   A TEMPORAL FILTER (TAA, a temporal upscaler) averages frames, so the crossfades are dithers that move every frame
+#   (temporal_dither) and the filter turns them into fades.
+#   NONE averages nothing, so a dither is a screen door: the hand-over is then a switch per tree at its own distance
+#   (handover_frac_native), with the crown kept as covered as the card it meets (thin_coverage, leaf_mip_alpha).
+#   MSAA smooths the leaves' and cards' cut edges once they are coverage (msaa_alpha_to_coverage).
+# Every tier: each tree switches LOD at its own distance (lod_jitter), not on a ring around the camera.
+
+## While a temporal filter runs on the forest's viewport (TAA, FSR2, MetalFX temporal), the crossfade dithers move
+## every frame, so the filter averages them into a fade; without one they hold still. Off: always still.
+@export var temporal_dither: bool = true
+
+## The share of the hand-over band one tree's crossfade takes while NO temporal filter runs (handover_frac is the
+## share with one): a still dither nobody averages is a screen door, so by default a tree switches to its card at its
+## own distance (0.02 of the band, under 2 m) instead. Bushes always use the whole band.
+@export_range(0.02, 1.0, 0.01) var handover_frac_native: float = 0.02:
+	set(v):
+		handover_frac_native = v
+		if _aa_ready:
+			_push_handover()
+
+## Each tree's mesh LOD switch distances move by up to this share either way, by the tree's own position: a stand
+## changes level tree by tree instead of on rings that travel with the camera. 0: exact rings.
+@export_range(0.0, 0.25, 0.01) var lod_jitter: float = 0.12:
+	set(v):
+		lod_jitter = v
+		if _indirect != null:
+			_indirect.lod_jitter = v
+
+## Leaf alpha raised with the mip level sampled (tree_wind `leaf_mip_scale`), so a crown keeps its covered share as it
+## shrinks on screen, as its impostor card does. 0: plain mips.
+@export_range(0.0, 1.0, 0.01) var leaf_mip_alpha: float = 0.25:
+	set(v):
+		leaf_mip_alpha = v
+		if _aa_ready:
+			push_lod_params()
+
+## How much of the coverage the distance thinning drops (foliage_thin_max) the kept leaves give back (tree_wind
+## `thin_coverage`): 1 a thinned crown covers about what its card does at the hand-over. 0: off.
+@export_range(0.0, 1.0, 0.01) var thin_coverage: float = 1.0:
+	set(v):
+		thin_coverage = v
+		if _aa_ready:
+			push_lod_params()
+
+## While the viewport runs MSAA, leaf and card edges become per-sample coverage (alpha to coverage: the tree shaders'
+## WF_A2C variant, in the alpha pass): MSAA then smooths them. Off by default: measured at MSAA 2x on a forest road it
+## took 2 % off the forest's crawl and added 3 % to its still twinkle, for up to 1.9 ms of GPU (the alpha pass and its
+## overdraw). Off, or without MSAA: the per-pixel cut.
+@export var msaa_alpha_to_coverage: bool = false
+
+## Alpha to coverage also writes depth per covered sample, so overlapping leaf edges keep their order; off, they land
+## in draw order and the alpha pass keeps its early depth test (cheaper).
+@export var a2c_depth_write: bool = false
+
 @export_group("Bushes")
 
 ## The farthest a bush is drawn; a small bush stops sooner (bush_px_min).
@@ -305,6 +363,30 @@ const GROUP := &"wuifwoud_forest"
 
 ## The far summary's texel size; it divides far_grid_m.
 @export_range(1.0, 256.0, 1.0, "or_greater", "suffix:m") var far_texel_m: float = 8.0
+
+## The shell's triangles nearer than its hand-over, where every pixel is dropped anyway, are not rasterised at all
+## (forest_far.gdshader `near_collapse`). Off: drawn and dropped per pixel.
+@export var far_near_collapse: bool = true:
+	set(v):
+		far_near_collapse = v
+		if _far != null:
+			_far.set_opt(far_near_collapse, far_layer_prune)
+
+## The crown layer's search skips the neighbour crowns that cannot reach a pixel (forest_far.gdshader `layer_prune`):
+## the same picture for less work. Off: every neighbour tested.
+@export var far_layer_prune: bool = true:
+	set(v):
+		far_layer_prune = v
+		if _far != null:
+			_far.set_opt(far_near_collapse, far_layer_prune)
+
+## The shell draws after the rest of the opaque scene, so what the terrain and everything nearer hide is rejected by
+## the depth test before its shader runs (the same picture). Off: drawn in the engine's own order.
+@export var far_late_draw: bool = true:
+	set(v):
+		far_late_draw = v
+		if _far != null:
+			_far.set_late_draw(v)
 
 @export_group("Roads")
 
@@ -2095,6 +2177,9 @@ func _ensure_far() -> void:
 	_far.top_level = true
 	var band := _far_band()
 	_far.set_band(band.x, band.y)
+	_far.set_opt(far_near_collapse, far_layer_prune)
+	_far.set_late_draw(far_late_draw)
+	_far.set_still_mode(_aa_ready and not _aa_temporal and handover_frac_native <= 0.1)
 	add_child(_far, false, Node.INTERNAL_MODE_BACK)
 
 
@@ -2650,6 +2735,7 @@ func _ensure_indirect() -> void:
 	ind.lod_bias = tree_lod_bias
 	ind.shadow_ring_m = tree_shadow_ring_m
 	ind.shadows_enabled = tree_shadows
+	ind.lod_jitter = lod_jitter
 	ind.cut_of = _species_cut_m
 	ind.card_near_m = maxf(tree_visibility_m - _BILLBOARD_OVERLAP, 0.0)
 	ind.card_far_m = billboard_far_m
@@ -2674,8 +2760,13 @@ func _ensure_indirect() -> void:
 func push_lod_params() -> void:
 	_lod_pushed_count = ForestAssets._live_materials.size()
 	for sm in ForestAssets._live_materials:
-		if not is_instance_valid(sm):
+		# The cards are in the same list (one wind feed) but carry their own thinning under the same names
+		# (card_thin_start_m, _bb_material): a mesh tree's numbers pushed onto a card grew every card from 80 m as if
+		# thinned there.
+		if not is_instance_valid(sm) or ForestAssets.is_card_material(sm):
 			continue
+		sm.set_shader_parameter("leaf_mip_scale", leaf_mip_alpha)
+		sm.set_shader_parameter("thin_coverage", thin_coverage)
 		sm.set_shader_parameter("thin_start_m", foliage_thin_start_m)
 		sm.set_shader_parameter("thin_end_m", tree_visibility_m)
 		sm.set_shader_parameter("thin_max", clampf(foliage_thin_max, 0.0, 1.0))
@@ -2694,7 +2785,7 @@ func push_lod_params() -> void:
 		sm.set_shader_parameter("lod_out1", band["out1"])
 		# A bush has no card behind it, so it must keep the whole band: see
 		# `handover_frac`. A tree hands over to its card and takes a sub-band.
-		sm.set_shader_parameter("handover_frac", 1.0 if bush else handover_frac)
+		sm.set_shader_parameter("handover_frac", 1.0 if bush else _handover_frac_now())
 
 
 ## How far card cells are BUILT: `billboard_ring_m` when set, else the tier's draw distance
@@ -2963,7 +3054,7 @@ func _bb_material(bb: Dictionary) -> void:
 	mat.set_shader_parameter("near_fade", _BILLBOARD_OVERLAP)
 	# The SAME fraction the mesh shader gets, over the SAME band: that is what makes
 	# the two sub-bands identical per tree, and the dither complementary.
-	mat.set_shader_parameter("handover_frac", handover_frac)
+	mat.set_shader_parameter("handover_frac", _handover_frac_now())
 	mat.set_shader_parameter("density_ramp_m", billboard_density_ramp_m)
 	# Dissolve out before the range ends, so the field thins into the haze instead of
 	# stopping on a line.
@@ -3204,8 +3295,61 @@ func _process(dt: float) -> void:
 			_indirect.update(VegetationIndirectRes.eye_of(cam))
 			_ft_end()
 	_ft_begin(&"process")
+	_aa_tick()
 	_animate(dt)
 	_ft_end()
+
+
+## ── Distance stability (the export group's header says why) ──────────────────
+var _aa_ready := false
+var _aa_temporal := false
+var _dither_sent := -1.0
+
+
+## Whether a temporal filter resolves `vp`'s 3D: TAA, or an upscaler that accumulates frames (FSR2, MetalFX temporal).
+static func temporal_filter_on(vp: Viewport) -> bool:
+	if vp == null:
+		return false
+	return vp.use_taa or vp.scaling_3d_mode == Viewport.SCALING_3D_MODE_FSR2 \
+		or vp.scaling_3d_mode == Viewport.SCALING_3D_MODE_METALFX_TEMPORAL
+
+
+## The hand-over share a tree takes now: handover_frac under a temporal filter, handover_frac_native without one.
+func _handover_frac_now() -> float:
+	return handover_frac if _aa_temporal else handover_frac_native
+
+
+## Every frame: the viewport's anti-aliasing read, and what follows from it. Three cheap reads; a push only on a change.
+func _aa_tick() -> void:
+	var vp := get_viewport()
+	var temporal := temporal_filter_on(vp)
+	if temporal != _aa_temporal or not _aa_ready:
+		_aa_temporal = temporal
+		_aa_ready = true
+		_push_handover()
+	var a2c: bool = msaa_alpha_to_coverage and vp != null and vp.msaa_3d != Viewport.MSAA_DISABLED
+	if a2c != ForestAssets._a2c_on or (a2c and a2c_depth_write != ForestAssets._a2c_depth):
+		ForestAssets.set_alpha_to_coverage(a2c, a2c_depth_write)
+	# 64 frames, Jimenez' period for the interleaved gradient's per-frame offset (wf_common `wf_dither`).
+	var f := float(Engine.get_process_frames() & 63) if temporal and temporal_dither else 0.0
+	if f != _dither_sent:
+		_dither_sent = f
+		ForestAssets.ensure_wind_globals()
+		RenderingServer.global_shader_parameter_set(&"wuifwoud_dither_frame", f)
+
+
+## The hand-over share onto every tree and card material (bushes keep the whole band: push_lod_params), and the far
+## forest's still mode where the trees switch per tree (no temporal filter, a narrow native share): its dithered
+## choices made coherent (forest_far.gdshader `still_mode`).
+func _push_handover() -> void:
+	var f := _handover_frac_now()
+	if _far != null:
+		_far.set_still_mode(not _aa_temporal and handover_frac_native <= 0.1)
+	for sm in ForestAssets._live_materials:
+		if not is_instance_valid(sm):
+			continue
+		if ForestAssets.is_card_material(sm) or not ForestAssets.is_bush_mesh(String(sm.resource_name)):
+			sm.set_shader_parameter("handover_frac", f)
 
 
 ## The forest's per-frame feel: the clutter ring, the wind clock, the vehicles' push points and rotor wash.

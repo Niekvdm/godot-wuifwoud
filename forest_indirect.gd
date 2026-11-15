@@ -121,6 +121,9 @@ const BLOCK_SPLIT := 256
 var lod_bias: float = 1.0
 ## Bands nearer than this cast shadows (the spawner's tree_shadow_ring_m).
 var shadow_ring_m: float = 200.0
+## Each tree's mesh LOD switch distances move by up to this share either way, by its own key (the spawner's
+## lod_jitter; wf_cull.glsl `lod_key`): no LOD ring travelling with the camera. 0: exact rings. Live: read every frame.
+var lod_jitter: float = 0.0
 ## Shadows off silences every species (the spawner's tree_shadows).
 var shadows_enabled: bool = true
 ## mesh name -> cut distance in metres. The spawner owns the policy (species size, tree
@@ -638,7 +641,7 @@ func _globals_bytes() -> PackedByteArray:
 	f[0] = _cam.x
 	f[1] = _cam.y
 	f[2] = _cam.z
-	f[3] = 0.0
+	f[3] = clampf(lod_jitter, 0.0, 0.5)
 	if _cam.distance_to(_thin_at) > THIN_MOVE_M:
 		_thin_at = _cam
 	f[4] = _thin_at.x

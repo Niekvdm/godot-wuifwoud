@@ -29,8 +29,20 @@ const ForestHeightPumpRes := preload("res://addons/wuifwoud/forest_height_pump.g
 const ForestMapsRes := preload("res://addons/wuifwoud/forest_maps.gd")
 ## The forest's log, through its sink.
 const ForestLogRes := preload("res://addons/wuifwoud/forest_log.gd")
-## The shell's shader.
-const SHADER := preload("res://addons/wuifwoud/shaders/forest_far.gdshader")
+## The shell's shader. LOADED LAZILY, after the forest's globals exist (ForestAssets.ensure_wind_globals): it reads
+## wf_common's `global uniform`s, and a global missing when the shader is parsed is a compile error that a later
+## registration does not undo (the tree shaders' rule, ForestAssets._wind_shader_res).
+const SHADER_PATH := "res://addons/wuifwoud/shaders/forest_far.gdshader"
+static var _shader: Shader = null
+
+
+## The shell's shader, its globals registered first.
+static func shader() -> Shader:
+	if _shader == null:
+		ForestAssets.ensure_wind_globals()
+		_shader = load(SHADER_PATH)
+	return _shader
+
 ## Touched cells rebuild at most this often while painting (ms).
 const TOUCH_MS := 250
 ## Region file loads in flight at once.
@@ -80,6 +92,10 @@ var _touched: Array = []   # Rect2: painted since the last flush
 var _flush_ms := -TOUCH_MS
 var _warned := {}
 var _band := Vector2(2600.0, 600.0)   # where the cards end, and the handover under them
+var _near_collapse := true             # forest_far.gdshader `near_collapse` (the forest's far_near_collapse)
+var _layer_prune := true               # forest_far.gdshader `layer_prune` (the forest's far_layer_prune)
+var _still_mode := false               # forest_far.gdshader `still_mode` (the forest's, with no temporal filter)
+var _late_draw := true                 # the cells drawn after the rest of the opaque scene (the forest's far_late_draw)
 ## A build whose mesh landed last tick and whose texture and node land this one: {"job", "mesh"}, or empty.
 var _landing := {}
 ## The palette's crown colours, read one species a tick before the start: species -> Color or null.
@@ -165,6 +181,62 @@ func set_band(cards_end_m: float, fade_m: float) -> void:
 			m.set_shader_parameter("fade_m", fade_m)
 
 
+## The shell's cost switches (the forest's far_near_collapse / far_layer_prune): every cell's material follows.
+func set_opt(near_collapse: bool, layer_prune: bool) -> void:
+	_near_collapse = near_collapse
+	_layer_prune = layer_prune
+	for c in _cells:
+		var mi = _cells[c].get("node")
+		if mi != null and is_instance_valid(mi):
+			_opt_to(mi.material_override, mi)
+
+
+## The cells' materials drawn after every other opaque material (the forest's far_late_draw): every cell follows.
+func set_late_draw(on: bool) -> void:
+	_late_draw = on
+	for c in _cells:
+		var mi = _cells[c].get("node")
+		if mi != null and is_instance_valid(mi):
+			(mi.material_override as ShaderMaterial).render_priority = LATE_PRIORITY if on else 0
+
+
+## The render priority of a late-drawn cell. Godot sorts opaque draws by priority first, so a cell at 1 draws after
+## everything at 0 (the terrain, the buildings, the trees): what they hide is then rejected by the depth test before the
+## shell's shader runs. The shell's cuts discard, which keeps its own depth WRITE late, not the test against what is
+## already drawn; and the order changes nothing on screen, where depth decides.
+const LATE_PRIORITY := 1
+
+
+## The shell's still mode (`on`: no temporal filter runs): its per-pixel dithered choices made coherent instead
+## (forest_far.gdshader `still_mode`: the hand-over by crown cell, the march's step offset, the layer-to-clump switch).
+func set_still_mode(on: bool) -> void:
+	if on == _still_mode:
+		return
+	_still_mode = on
+	for c in _cells:
+		var mi = _cells[c].get("node")
+		if mi != null and is_instance_valid(mi):
+			(mi.material_override as ShaderMaterial).set_shader_parameter("still_mode", on)
+
+
+## A cell material's cost switches and what the near collapse needs: the cell's height span (world y of its mesh,
+## walls included) and the farthest a triangle reaches across the ground from one of its vertices (a quad's diagonal,
+## doubled for slack).
+func _opt_to(m: ShaderMaterial, mi: MeshInstance3D) -> void:
+	if m == null:
+		return
+	m.set_shader_parameter("near_collapse", _near_collapse)
+	m.set_shader_parameter("layer_prune", _layer_prune)
+	m.set_shader_parameter("still_mode", _still_mode)
+	m.render_priority = LATE_PRIORITY if _late_draw else 0
+	if mi.mesh != null:
+		var xf: Transform3D = mi.global_transform if mi.is_inside_tree() else mi.transform
+		var ab: AABB = xf * mi.mesh.get_aabb()
+		m.set_shader_parameter("y_span", Vector2(ab.position.y, ab.end.y))
+	var g := float(forest.far_grid_m) if forest != null else 16.0
+	m.set_shader_parameter("tri_reach_m", g * 2.0 * sqrt(2.0))
+
+
 ## Everything in flight landed and dropped (the forest's exit, a teardown, switched off): loads fetched, workers waited
 ## for. What was summarised stays.
 func drain() -> void:
@@ -202,7 +274,7 @@ func info() -> Dictionary:
 static func material_for(summary: Texture2D, palette: Texture2D, origin: Vector2, cell_m: float, texels: int,
 		band: Vector2, coast_m: float, mid_m: float) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
-	m.shader = SHADER
+	m.shader = shader()
 	m.set_shader_parameter("summary", summary)
 	m.set_shader_parameter("palette", palette)
 	m.set_shader_parameter("cell_origin", origin)
@@ -668,6 +740,7 @@ func _finish_build(job: Dictionary, mesh: ArrayMesh) -> void:
 		cell["node"] = mi
 	mi.mesh = mesh
 	mi.material_override = mat
+	_opt_to(mat, mi)
 	stats["built"] = int(stats["built"]) + 1
 
 
