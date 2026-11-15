@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- The height pump's disk fallback no longer keeps every region file it reads. It loaded each with
+  `ResourceLoader.load()` inside a WorkerThreadPool task, and in Godot 4.8 such a load is never freed: measured
+  headless, ~11-13 MB a 1024² region for the rest of the run (with `CACHE_MODE_REPLACE` one copy a region, up to the
+  whole map: ~1.8 GB for an island of 140 regions; with `IGNORE` one a load). The pump now requests the threaded loader
+  on the main thread (`collect()` polls it, 8 loads in flight and the rest queued, all reading `pending`), takes a
+  region once it reads loaded, never earlier (a blocking get before the pool has started a load keeps it too), and hands
+  its height bytes to a worker for the conversion as before; the worker drops the region. `CACHE_MODE_REUSE` instead of
+  `REPLACE`: a region the cache holds is not read again, and is never overwritten from its file. A pump let go with
+  loads in flight still takes them. The main thread pays ~5 µs a load in flight a frame and ~20 µs to land one
+  (measured: 64 regions, 100 µs a frame on average while they load).
 - Trunk collider shares: `ForestSpawner.set_trunk_share(share)` ranks the collision group's members
   (`ForestTrunkPool.member_share`, a Callable returning `ForestTrunkPool.Share`). A PRIMARY member (every member when
   unset, as before) keeps the trunks within `radius_m`; a SECONDARY member gets the trunks within `secondary_radius_m`
