@@ -88,17 +88,59 @@ static func gltf_buffers(path: String) -> PackedStringArray:
 
 
 ## What else a build's output depends on, as built.json keeps it: "settings", an MD5 of the fields the preparation and
-## the bake read (its leaf materials, its alpha cut), and "imports", each file's import settings: an MD5 of the [params]
-## of its .import ("" without one), not of its remap, which moves with the platform and the engine.
+## the bake read (its leaf materials, its alpha cut); "roles", an MD5 of which file plays which part (the mesh, the bark's
+## and the foliage's textures: the same files in other roles hash the same bytes, but bake differently); and "imports",
+## each file's import settings: an MD5 of the [params] of its .import ("" without one), not of its remap, which moves
+## with the platform and the engine, and, when those settings name an import script, of that script's source and the
+## scripts it extends by path (a changed post-import changes the mesh without touching the file or its settings).
 func build_inputs() -> Dictionary:
 	var imports := {}
 	for f in files():
-		var params := import_params(f)
-		imports[f] = params.md5_text() if params != "" else ""
+		imports[f] = import_digest(f)
 	return {
 		"settings": JSON.stringify({"foliage_materials": Array(foliage_materials), "alpha_cut": alpha_cut}, "", true).md5_text(),
+		"roles": roles_digest(),
 		"imports": imports,
 	}
+
+
+## Which file plays which part, as an MD5 (the paths resolved).
+func roles_digest() -> String:
+	var roles := {}
+	for k in ["mesh", "bark_albedo", "bark_normal", "bark_mtao", "foliage_albedo", "foliage_normal", "foliage_mtao"]:
+		roles[k] = resolve(String(get(k)))
+	return JSON.stringify(roles, "", true).md5_text()
+
+
+## `path`'s import settings as an MD5 ("" without a .import): its [params], and the source of the import script they
+## name (and of the scripts that one extends by path) when they name one. Without a script, the MD5 of the [params]
+## alone, as before the script was taken in.
+static func import_digest(path: String) -> String:
+	var params := import_params(path)
+	if params == "":
+		return ""
+	var m := RegEx.create_from_string("import_script/path=\"([^\"]+)\"").search(params)
+	if m == null:
+		return params.md5_text()
+	return (params + "\n" + _script_chain(resolve(m.get_string(1)))).md5_text()
+
+
+## The sources of a script and of the scripts it extends by path (`extends "<path>"`), up to 8 deep; a script that
+## does not read is its path alone.
+static func _script_chain(path: String) -> String:
+	var out := ""
+	var seen := {}
+	var at := path
+	while at != "" and not seen.has(at) and seen.size() < 8:
+		seen[at] = true
+		if not FileAccess.file_exists(at):
+			out += "\n" + at
+			break
+		var src := FileAccess.get_file_as_string(at)
+		out += "\n" + at + "\n" + src
+		var e := RegEx.create_from_string("(?m)^extends\\s+\"([^\"]+)\"").search(src)
+		at = resolve(e.get_string(1)) if e != null else ""
+	return out
 
 
 ## The [params] section of `path`'s .import ("" without one).

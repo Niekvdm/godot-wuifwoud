@@ -247,6 +247,41 @@ static func run() -> Dictionary:
 	_chk(r, "a file's import settings: new (%s) or changed (%s): needs building; built again: built (%s); its remap moved alone: still built (%s)"
 		% [why_new_imp, why_imp, imp_built, remap_only], why_new_imp == "bark.png's import settings changed"
 		and why_imp == "bark.png's import settings changed" and imp_built == "built" and remap_only == "built")
+	# the same file in another role (bark's texture as the foliage's: the same bytes hashed, a different bake)
+	BuildRes.new([pack]).run_now()
+	ts.foliage_albedo = ts.bark_albedo
+	ts.bark_albedo = ""
+	var why_role := _why(pack, "W_Tree")
+	BuildRes.new([pack]).run_now()
+	var role_built: String = _states(pack)["W_Tree"]
+	ts.bark_albedo = ts.foliage_albedo
+	ts.foliage_albedo = ""
+	var why_role_back := _why(pack, "W_Tree")
+	BuildRes.new([pack]).run_now()
+	_chk(r, "a file moved to another role (%s), and back (%s): needs building; built again: built (%s)"
+		% [why_role, why_role_back, role_built], why_role == "which file plays which part changed"
+		and why_role_back == "which file plays which part changed" and role_built == "built")
+	# an import script its settings name: its source, and the source of the script it extends by path, count
+	var base_src := "@tool\nextends EditorScenePostImport\n# v1\n"
+	var post := FileAccess.open(ROOT + "/t/post_base.gd", FileAccess.WRITE)
+	post.store_string(base_src)
+	post.close()
+	post = FileAccess.open(ROOT + "/t/post.gd", FileAccess.WRITE)
+	post.store_string("@tool\nextends \"%s\"\n" % (ROOT + "/t/post_base.gd"))
+	post.close()
+	_import(ROOT + "/t/bark.png", "", "compress/mode=2\nimport_script/path=\"%s\"" % (ROOT + "/t/post.gd"))
+	BuildRes.new([pack]).run_now()
+	var script_built: String = _states(pack)["W_Tree"]
+	post = FileAccess.open(ROOT + "/t/post_base.gd", FileAccess.WRITE)
+	post.store_string(base_src.replace("v1", "v2"))
+	post.close()
+	var why_script := _why(pack, "W_Tree")
+	_import(ROOT + "/t/bark.png", "", "compress/mode=2")
+	var no_script := ForestSpecies.import_digest(ROOT + "/t/bark.png") == "[params]\n\ncompress/mode=2".md5_text()
+	BuildRes.new([pack]).run_now()
+	_chk(r, "an import script changed in the script it extends: needs building (%s); built with it: built (%s); without a script the digest is the [params]' MD5 as before (%s)"
+		% [why_script, script_built, str(no_script)], why_script == "bark.png's import settings changed"
+		and script_built == "built" and no_script)
 	var g := FileAccess.open(ROOT + "/m/g.gltf", FileAccess.WRITE)
 	g.store_string(JSON.stringify({"asset": {"version": "2.0"}, "buffers": [{"uri": "g%20b.bin", "byteLength": 4},
 		{"uri": "data:application/octet-stream;base64,AAAA", "byteLength": 3}]}))

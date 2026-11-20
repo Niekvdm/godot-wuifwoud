@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- The pack build notices two more changes that need a species built again (and its impostor baked again):
+  - a file moved to another role (the same texture as the foliage's instead of the bark's, say): built.json now records
+    which file plays which part (`roles`); an entry built before keeps its build until its next one records them;
+  - a changed import script: a file's import settings now take in the source of the import script they name and of
+    the scripts that one extends by path, so a post-import that reshapes a mesh no longer leaves an old build (and an
+    old impostor) in place. A file without an import script hashes as before.
 - Distance stability (a new inspector group): the forest reads its viewport's anti-aliasing every frame (`use_taa`,
   `scaling_3d_mode`, `msaa_3d`) and adapts, with nothing to feed.
   - Under a temporal filter (TAA, FSR2, MetalFX temporal) the crossfade dithers move every frame (`temporal_dither`;

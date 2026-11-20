@@ -167,6 +167,9 @@ static func state_of(s, dir: String, man: Dictionary) -> Dictionary:
 	var inputs: Dictionary = s.build_inputs()
 	if String(e["settings"]) != String(inputs["settings"]):
 		return {"state": "needs", "why": "its settings changed"}
+	# recorded since roles were tracked; an older entry has none and is taken as it is (its next build records them)
+	if e.has("roles") and String(e["roles"]) != String(inputs["roles"]):
+		return {"state": "needs", "why": "which file plays which part changed"}
 	var imp: Dictionary = e.get("imports", {})
 	for f in (inputs["imports"] as Dictionary):
 		if String(imp.get(f, "")) != String(inputs["imports"][f]):
@@ -419,7 +422,8 @@ func _land(r: Dictionary, b: Dictionary) -> void:
 		DirAccess.rename_absolute(stage.path_join(f), dst.path_join(f))
 	var inputs: Dictionary = r.get("inputs", {})
 	var e := {"prep_version": AssetsRes.PREP_VERSION, "pack": String(r.get("pack", "")), "sources": r.get("sources", {}),
-		"settings": inputs.get("settings", ""), "imports": inputs.get("imports", {}), "warnings": Array(warnings)}
+		"settings": inputs.get("settings", ""), "roles": inputs.get("roles", ""), "imports": inputs.get("imports", {}),
+		"warnings": Array(warnings)}
 	if sheets:
 		e["span"] = float(b["span"])
 		e["w"] = float(b["w"])
