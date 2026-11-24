@@ -2691,6 +2691,11 @@ func apply_quality_params(p: Dictionary) -> void:
 	tree_shadow_ring_m = float(p["shadow_ring"])
 	billboard_far_m = float(p["billboard_far"])
 	_quality_density_scale = float(p["density_scale"])
+	# Optional: the far forest's handover under the cards (far_fade_m). A tier may start the shell well inside the
+	# card range: from a kilometre out the cards are a few pixels each and thinned, so between them the eye sees the
+	# ground, and the band reads pale and flat until the shell's shaded canopy arrives under it.
+	if p.has("far_fade"):
+		far_fade_m = float(p["far_fade"])
 	if _far != null:
 		var band := _far_band()
 		_far.set_band(band.x, band.y)

@@ -212,7 +212,7 @@ per far cell, coloured from the species' impostor bakes.
 | Setting | Default | Meaning |
 |---|---|---|
 | `far_forest` | true | the far forest on or off |
-| `far_fade_m` | 600 | the hand-over band under the last cards |
+| `far_fade_m` | 600 | the hand-over band under the last cards (a quality tier may set it: `far_fade` in `apply_quality_params`). Wider starts the shaded canopy under the distant cards, which at a few pixels each and thinned otherwise show the ground between them |
 | `far_cell_regions` | 4 | regions per far cell, each way |
 | `far_grid_m` | 16 | the shell's quad size (divides the region) |
 | `far_texel_m` | 8 | the summary's texel size (divides `far_grid_m`) |

@@ -146,6 +146,15 @@ static func run() -> Dictionary:
 		"density_scale": 1.0})
 	_chk(r, "the quality tier moves the handover (%s)" % str(mat.get_shader_parameter("far_cut") if mat != null else null),
 		mat != null and is_equal_approx(float(mat.get_shader_parameter("far_cut")), 1800.0))
+	var fade0: float = float(mat.get_shader_parameter("fade_m")) if mat != null else -1.0
+	_chk(r, "a tier without far_fade leaves the shell's handover as it was (%.0f m)" % fade0,
+		mat != null and is_equal_approx(fade0, vp.far_fade_m))
+	vp.apply_quality_params({"visibility": 200.0, "lod_bias": 1.0, "shadow_ring": 100.0, "billboard_far": 1800.0,
+		"density_scale": 1.0, "far_fade": 1100.0})
+	_chk(r, "a tier's far_fade starts the shell further inside the cards (fade_m %s, far_fade_m %.0f)" % [
+			str(mat.get_shader_parameter("fade_m") if mat != null else null), vp.far_fade_m],
+		mat != null and is_equal_approx(float(mat.get_shader_parameter("fade_m")), 1100.0)
+		and is_equal_approx(vp.far_fade_m, 1100.0))
 	var info: Dictionary = vp.debug_churn().get("far", {})
 	_chk(r, "the debug numbers (%s)" % str(info),
 		int(info.get("cells", 0)) == 12 and int(info.get("pending", -1)) == 0 and int(info.get("built", 0)) == 12
