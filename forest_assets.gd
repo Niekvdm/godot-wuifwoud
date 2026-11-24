@@ -288,6 +288,21 @@ static func billboard_shader_a2c(depth := false) -> Shader:
 	return _billboard_shader_a2c
 
 
+## An impostor card's basis (right, up), world space: tree_billboard.gdshader's vertex() in GDScript, kept equal to it
+## (tests pin the properties). `to_cam` is the unit direction from the tree to the camera (an orthographic pass: the
+## camera's back axis), `tree_up` the instance's unit up, `cam_right` the camera's unit right. The card takes its
+## frame's baked basis (right = tree_up x to_cam, as the bake's look_at built it), handing over to the camera's right
+## within 10-20 deg of overhead, where the tree's basis spins with the azimuth.
+static func card_basis(to_cam: Vector3, tree_up: Vector3, cam_right: Vector3) -> Array:
+	var tr := tree_up.cross(to_cam)
+	var tl := tr.length()
+	var right := tr / tl if tl > 1e-5 else cam_right
+	var k := smoothstep(0.17, 0.34, tl)
+	right = cam_right.lerp(right, k).normalized()
+	right = (right - to_cam * right.dot(to_cam)).normalized()
+	return [right, to_cam.cross(right).normalized()]
+
+
 ## A material this file made for an impostor card (card_of marks them): the spawner's mesh-tree pushes skip them.
 static func is_card_material(m: Material) -> bool:
 	return m != null and m.has_meta(&"wf_card")

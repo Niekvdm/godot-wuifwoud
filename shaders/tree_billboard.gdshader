@@ -370,18 +370,33 @@ void vertex() {
 	// ...but its DISTANCE is to the main camera, like the mesh shader's, so one tree
 	// sees one distance on both sides of the hand-over (wf_common `wf_cam_pos`).
 	vdist = distance(inst, wf_cam_pos(MAIN_CAM_INV_VIEW_MATRIX));
-	vec3 to_cam = normalize(cam - inst);
+	// An ORTHOGRAPHIC pass (a directional light's shadow cascade) has parallel rays: every card faces along the
+	// camera's back axis. Its `INV_VIEW_MATRIX[3]` is only a point far back along the light, and facing that point
+	// turned each card off the light's rays by its offset from the cascade centre.
+	bool ortho = PROJECTION_MATRIX[3][3] > 0.5;
+	vec3 to_cam = ortho ? normalize(INV_VIEW_MATRIX[2].xyz) : normalize(cam - inst);
 	// THE CARD IS SPHERICAL, NOT CYLINDRICAL. A world-up lock suits an atlas of azimuths
 	// only (a card that tips shows a view it does not have); the hemi-octahedral atlas
 	// HAS every elevation, so the card can face the camera squarely, which is what makes
 	// it hold up from a plane: a world-up-locked quad has zero projected area looking
 	// straight down.
 	//
-	// A basis of `cross(world_up, to_cam)` COLLAPSES when the camera is overhead, and a
-	// fallback for it hands every card the same `right`: a radial splay out of screen
-	// centre. Building the basis from the camera's own right vector has no such
-	// degeneracy.
-	vec3 right = normalize(INV_VIEW_MATRIX[0].xyz);
+	// THE CARD IS ORIENTED AS ITS FRAME WAS BAKED: right = tree_up x to_cam, up = to_cam x right, the
+	// basis the bake's `look_at(centre, up)` gave each frame (wf_common `wf_frame_basis`). It used to take the
+	// CAMERA's right for every card, which matches the bake only for a card at screen centre under a level
+	// camera: anywhere else the baked image was drawn rolled by the difference. Off-centre cards leaned
+	// (the trunks on a slope seen from above all tilted one way), and a rolling camera (a car leaning, a
+	// banked road, head tracking) rolled every card with the screen while the mesh trees stayed upright.
+	// Near overhead tree_up x to_cam collapses and spins with the azimuth (a radial splay out of screen
+	// centre), so within 10-20 deg of the pole it hands over to the camera's right, which has no such
+	// degeneracy. ForestAssets.card_basis is this in GDScript (its test pins the properties): keep them equal.
+	vec3 cam_right = normalize(INV_VIEW_MATRIX[0].xyz);
+	vec3 tree_up = normalize(MODEL_MATRIX[1].xyz);
+	vec3 tr = cross(tree_up, to_cam);
+	float tl = length(tr);
+	vec3 right = tl > 1e-5 ? tr / tl : cam_right;
+	right = normalize(mix(cam_right, right, smoothstep(0.17, 0.34, tl)));
+	right = normalize(right - to_cam * dot(right, to_cam));
 	vec3 up = normalize(cross(to_cam, right));
 	sil = vec2(UV.x, 1.0 - UV.y);            // QuadMesh v runs top→bottom
 	// The card basis, carried into VIEW space for the crown dome in fragment(). Set
