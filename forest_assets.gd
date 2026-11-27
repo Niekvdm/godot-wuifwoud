@@ -1401,7 +1401,12 @@ static func card_of(id: String, sp, p: Dictionary, ring: Dictionary, profile: in
 	# and every impostor comes out WHITE: a hillside of white lollipops past
 	# tree_visibility_m that turn green the moment they cross into mesh range.
 	var crown: Vector4 = p.get("crown_uv", Vector4(0.0, 0.0, 1.0, 1.0))
-	var atlas := _atlas_of(sp, true)
+	# The filled leaf sheet when the species' build made one (the same leaves; the card's fallback path samples it), so
+	# its source sheet is not loaded beside it: the mesh trees draw the filled one too.
+	var bd := built_dir_of(id)
+	var atlas := leaf_at(bd, id, _manifest(bd))
+	if atlas == null:
+		atlas = _atlas_of(sp, true)
 	var q := QuadMesh.new()
 	var mesh: Mesh = q
 	var sm := ShaderMaterial.new()
