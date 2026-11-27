@@ -15,6 +15,10 @@ render_mode unshaded, cull_disabled;
 //   channel 1  NORMAL + TRANSMISSION: the normal the mesh is lit with (spherified or
 //              authored, back faces handled as the mesh handles them, the normal map
 //              applied), in THIS VIEW's space, x/y in R/G; the backlight weight in B.
+//   channel 2  DEPTH: how far the texel stands in front of the tile's centre plane (toward
+//              this view's camera), in span units, as depth * `depth_scale` + 0.5 in R and
+//              1 in G, which the premultiply turns into (depth x coverage, coverage). The
+//              card reprojects each blended frame by it (tree_billboard.gdshader).
 //
 // UNSHADED IS AN IDENTITY ON THE OUTPUT. With the bake's LINEAR tonemapper at exposure 1,
 // what lands in the viewport is linear_to_srgb(ALBEDO). Channel 0 is a colour and wants
@@ -43,6 +47,10 @@ uniform float spherify : hint_range(0.0, 1.0) = 0.0;
 uniform float crown_floor = -1.0e6;
 uniform float crown_ao : hint_range(0.0, 1.0) = 0.45;
 uniform float foliage_mask = 1.0;
+// The depth channel's origin (the tile's centre, where every bake camera aims, in the
+// bake's world) and 1 / (span * DEPTH_RANGE): ForestImpostorBaker sets both per species.
+uniform vec3 depth_centre = vec3(0.0);
+uniform float depth_scale = 1.0;
 
 varying float crown_depth;
 varying float leaf_w;
@@ -68,7 +76,13 @@ void fragment() {
 	if (tex.a < alpha_cut) {
 		discard;
 	}
-	if (channel == 0) {
+	if (channel == 2) {
+		// View space looks down -Z, so +Z is toward this view's camera: a texel nearer the
+		// camera than the centre plane has the larger view-space z.
+		float zc = (VIEW_MATRIX * vec4(depth_centre, 1.0)).z;
+		float e = clamp((VERTEX.z - zc) * depth_scale + 0.5, 0.0, 1.0);
+		ALBEDO = srgb_to_linear(vec3(e, 1.0, 0.0));
+	} else if (channel == 0) {
 		// tree_wind's `shade`, without the world-space break-up noise (a property of where
 		// a tree stands, not of the tree: the card gets its per-instance tint instead).
 		float crown_k = has_mtao ? crown_ao * 0.35 : crown_ao;

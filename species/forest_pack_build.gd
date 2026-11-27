@@ -145,6 +145,15 @@ static func state_of(s, dir: String, man: Dictionary) -> Dictionary:
 		return {"state": "needs", "why": "it has no picture yet"}
 	if bool(e.get("picture", false)) and not FileAccess.file_exists(dir.path_join(String(s.id) + "_picture.res")):
 		return {"state": "needs", "why": "its picture is gone"}
+	# A species with impostor sheets from a bake before the trimmed card and the depth sheet: it still draws (the plain
+	# square, no parallax), and a build gives it both.
+	if man.has("bake") and e.has("span"):
+		var bk: Dictionary = man["bake"]
+		var id := String(s.id)
+		if int(bk.get("trim_bands", 0)) <= 0 or float(bk.get("depth_range", 0.0)) <= 0.0 \
+				or not FileAccess.file_exists(dir.path_join(id + "_trim.res")) \
+				or not FileAccess.file_exists(dir.path_join(id + "_depth.res")):
+			return {"state": "needs", "why": "its impostor has no trim or depth sheet yet"}
 	var src: Dictionary = e.get("sources", {})
 	var files: PackedStringArray = s.files()
 	for f in src:
@@ -378,6 +387,19 @@ func _store(res: Dictionary, out: Dictionary) -> void:
 		else:
 			out.merge({"albedo": alb, "normal": nrm, "span": res["span"], "w": res["w"], "h": res["h"],
 				"crown_colour": crown_colour_of(alb)})
+			# The depth sheet (a bake before it had none): the card's parallax. A sheet that does not compress is
+			# left out, and the card reprojects on the frames' planes alone.
+			var dep = BakerRes.store_image(res["depth"], true) if res.get("depth") is Image else null
+			if dep != null:
+				out["depth"] = dep
+			elif res.get("depth") is Image:
+				out["warning"] = "its impostor depth sheet could not be compressed (BC5): its card has no parallax"
+			# The card's trim, measured on the sheets AS STORED: what the card samples is what it may not cut.
+			var trim = BakerRes.trim_of(alb, dep)
+			if trim != null:
+				out["trim"] = trim
+			else:
+				out["warning"] = "its impostor card could not be trimmed: it draws the full square"
 
 
 ## A species lands (main thread): its sheets saved to the staging folder, its files renamed into built/ (an older
@@ -402,6 +424,28 @@ func _land(r: Dictionary, b: Dictionary) -> void:
 			files.append_array([id + "_albedo.res", id + "_normal.res"])
 		else:
 			warnings.append("its impostor sheets could not be saved (%s, %s)" % [error_string(e0), error_string(e1)])
+	# The depth sheet and the trim ride with the sheets they were measured with: older ones left beside new sheets
+	# would shift and cut them.
+	var deep := false
+	if sheets and b.has("depth"):
+		var ed := _save_sheet(b["depth"], stage.path_join(id + "_depth.res"))
+		if ed == OK:
+			deep = true
+			files.append(id + "_depth.res")
+		else:
+			warnings.append("its impostor depth sheet could not be saved (%s)" % error_string(ed))
+	if not deep and FileAccess.file_exists(dst.path_join(id + "_depth.res")):
+		DirAccess.remove_absolute(dst.path_join(id + "_depth.res"))
+	var trimmed := false
+	if sheets and b.has("trim"):
+		var et := _save_trim(b["trim"], stage.path_join(id + "_trim.res"))
+		if et == OK:
+			trimmed = true
+			files.append(id + "_trim.res")
+		else:
+			warnings.append("its impostor card's trim could not be saved (%s)" % error_string(et))
+	if not trimmed and FileAccess.file_exists(dst.path_join(id + "_trim.res")):
+		DirAccess.remove_absolute(dst.path_join(id + "_trim.res"))
 	if not sheets:
 		for f in [id + "_albedo.res", id + "_normal.res"]:
 			if FileAccess.file_exists(dst.path_join(f)):
@@ -453,6 +497,12 @@ static func _save_sheet(img: Image, path: String) -> Error:
 	return ResourceSaver.save(img, path)
 
 
+## The card's trim saved as an Image, its resource id fixed (the same trim is the same bytes whoever built it).
+static func _save_trim(img: Image, path: String) -> Error:
+	img.resource_scene_unique_id = "trim"
+	return ResourceSaver.save(img, path)
+
+
 ## The picture saved as an Image, its resource id fixed (the same picture is the same bytes whoever built it), compressed.
 static func _save_picture(img: Image, path: String) -> Error:
 	img.resource_scene_unique_id = "picture"
@@ -471,7 +521,7 @@ func _discard(r: Dictionary) -> void:
 		return
 	var stage := _stage(r["dir"])
 	for f in [String(r["id"]) + ".res", String(r["id"]) + "_albedo.res", String(r["id"]) + "_normal.res",
-			String(r["id"]) + "_picture.res"]:
+			String(r["id"]) + "_depth.res", String(r["id"]) + "_trim.res", String(r["id"]) + "_picture.res"]:
 		if FileAccess.file_exists(stage.path_join(f)):
 			DirAccess.remove_absolute(stage.path_join(f))
 
@@ -530,7 +580,7 @@ func _end() -> bool:
 					gone.append(id)
 			for id in gone:
 				for f in [String(id) + ".res", String(id) + "_albedo.res", String(id) + "_normal.res",
-						String(id) + "_picture.res"]:
+						String(id) + "_depth.res", String(id) + "_trim.res", String(id) + "_picture.res"]:
 					var p := ProjectSettings.globalize_path(String(dir).path_join(f))
 					if FileAccess.file_exists(p):
 						DirAccess.remove_absolute(p)

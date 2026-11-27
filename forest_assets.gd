@@ -599,10 +599,9 @@ static func card_radius(mesh_name: String) -> float:
 	var bb := _billboard(mesh_name)
 	if bb.is_empty():
 		return 0.0
-	var q := bb["mesh"] as QuadMesh
-	if q == null:
+	if not bb.has("size"):
 		return species_radius(mesh_name)
-	return q.size.length() * 0.5 + species_height(mesh_name) * 0.5
+	return (bb["size"] as Vector2).length() * 0.5 + species_height(mesh_name) * 0.5
 
 
 ## The distance at which a plant of this species stands `px_min` pixels tall.
@@ -1369,7 +1368,8 @@ static func _crown_uv_of(mesh: ArrayMesh, foliage: PackedInt32Array) -> Vector4:
 
 
 ## An impostor card for species `id` (`sp` its ForestSpecies or null, `p` its preparation, `ring` its baked view ring or
-## {}, `profile` its silhouette family): {"mesh": QuadMesh, "mat": ShaderMaterial}. Neither cached nor registered for
+## {}, `profile` its silhouette family): {"mesh": QuadMesh, or the band strip of a trimmed ring, "mat": ShaderMaterial,
+## "size": the card's square}. Neither cached nor registered for
 ## the wind and the hand-over pushes: _billboard does both for the forest's own cards; the Species dialog's view draws
 ## one of its own.
 static func card_of(id: String, sp, p: Dictionary, ring: Dictionary, profile: int) -> Dictionary:
@@ -1382,6 +1382,7 @@ static func card_of(id: String, sp, p: Dictionary, ring: Dictionary, profile: in
 	var crown: Vector4 = p.get("crown_uv", Vector4(0.0, 0.0, 1.0, 1.0))
 	var atlas := _atlas_of(sp, true)
 	var q := QuadMesh.new()
+	var mesh: Mesh = q
 	var sm := ShaderMaterial.new()
 	sm.shader = _billboard_shader_res()
 	sm.resource_name = id
@@ -1416,6 +1417,20 @@ static func card_of(id: String, sp, p: Dictionary, ring: Dictionary, profile: in
 		sm.set_shader_parameter("crown_extent", Vector2(
 			span / rw if rw > 0.001 else 1.0,
 			span / rh if rh > 0.001 else 1.0))
+		# THE TRIMMED CARD, when the bake measured one: the band strip, pulled in per view by the shader. Without a
+		# trim the strip would be the same square at eight times the triangles, so the quad stays.
+		# THE DEPTH SHEET: each blended frame shifted by the depth it baked (tree_billboard.gdshader `frame_uv`).
+		if ring.get("depth") is Texture2D:
+			sm.set_shader_parameter("impostor_depth", ring["depth"])
+			sm.set_shader_parameter("depth_range", float(ring["depth_range"]))
+		var bands := int(ring.get("trim_bands", 0))
+		if ring.get("trim") is Texture2D and bands > 0:
+			mesh = _card_strip(span, bands)
+			sm.set_shader_parameter("impostor_trim", ring["trim"])
+			sm.set_shader_parameter("trim_bands", bands)
+			sm.set_shader_parameter("trim_sets", int(ring["trim_sets"]))
+			sm.set_shader_parameter("trim_tile", float(ring["tile"]))
+			sm.set_shader_parameter("card_span", span)
 	else:
 		q.size = Vector2(height * 0.62, height)
 		sm.set_shader_parameter("card_pivot_h", height * 0.5)   # base sits at the pivot
@@ -1432,7 +1447,35 @@ static func card_of(id: String, sp, p: Dictionary, ring: Dictionary, profile: in
 	# hand-over.
 	sm.set_shader_parameter("backlight_col", Color(0.10, 0.14, 0.05))
 	sm.set_shader_parameter("profile", profile)
-	return {"mesh": q, "mat": sm}
+	return {"mesh": mesh, "mat": sm, "size": q.size}
+
+
+## The trimmed card's mesh: `bands` horizontal bands over a `span` square, two vertices a row (bottom row first), laid
+## out exactly as a QuadMesh of that size (centred, UV v top→bottom), so untrimmed it IS the square. The shader moves
+## the vertices; row k's is UV.y = 1 - k / bands, its side UV.x.
+static func _card_strip(span: float, bands: int) -> ArrayMesh:
+	var verts := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	var normals := PackedVector3Array()
+	var idx := PackedInt32Array()
+	for k in bands + 1:
+		var v := float(k) / bands
+		for side in 2:
+			verts.append(Vector3((float(side) - 0.5) * span, (v - 0.5) * span, 0.0))
+			uvs.append(Vector2(float(side), 1.0 - v))
+			normals.append(Vector3(0, 0, 1))
+	for k in bands:
+		var a := k * 2
+		idx.append_array([a, a + 2, a + 1, a + 1, a + 2, a + 3])
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = verts
+	arr[Mesh.ARRAY_NORMAL] = normals
+	arr[Mesh.ARRAY_TEX_UV] = uvs
+	arr[Mesh.ARRAY_INDEX] = idx
+	var m := ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	return m
 
 
 ## Impostor card + material for a species: a QuadMesh sized to the tree's real
@@ -1543,7 +1586,7 @@ static func ring_at(dir: String, id: String, man: Dictionary) -> Dictionary:
 	if dir == "" or not e.has("span") or int(bake.get("grid", 0)) <= 0 \
 			or not ResourceLoader.exists(a) or not ResourceLoader.exists(n):
 		return {}
-	return {
+	var out := {
 		"albedo": _sheet(a),
 		"normal": _sheet(n),
 		"grid": int(bake["grid"]),
@@ -1555,6 +1598,24 @@ static func ring_at(dir: String, id: String, man: Dictionary) -> Dictionary:
 		"w": float(e.get("w", 0.0)),
 		"h": float(e.get("h", 0.0)),
 	}
+	# THE DEPTH SHEET, when this bake rendered one (a bake that predates it names no `depth_range`).
+	var dp := dir.path_join(id + "_depth.res")
+	if float(bake.get("depth_range", 0.0)) > 0.0 and ResourceLoader.exists(dp):
+		var dtex := _sheet(dp)
+		if dtex != null:
+			out["depth"] = dtex
+			out["depth_range"] = float(bake["depth_range"])
+	# THE CARD'S TRIM (ForestImpostorBaker.trim_of), when this bake measured one: a bake that predates it says no
+	# `trim_bands`, and a sheet it did not write is not read against its layout.
+	var tr := dir.path_join(id + "_trim.res")
+	if int(bake.get("trim_bands", 0)) > 0 and int(bake.get("trim_sets", 0)) > 0 and ResourceLoader.exists(tr):
+		var tex := _sheet(tr)
+		if tex != null:
+			out["trim"] = tex
+			out["trim_bands"] = int(bake["trim_bands"])
+			out["trim_sets"] = int(bake["trim_sets"])
+			out["tile"] = int(bake.get("tile", 0))
+	return out
 
 
 ## The baked view ring of a species (its pack's build bakes it), or {} if it has none: the procedural

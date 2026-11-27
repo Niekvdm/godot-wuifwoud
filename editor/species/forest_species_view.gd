@@ -119,6 +119,9 @@ func _init() -> void:
 	_card = MeshInstance3D.new()
 	_card.name = "Card"
 	_card.layers = CARD_LAYER
+	# As the forest draws it: a card never casts (ForestIndirect's card bins). A card that did would turn to face the
+	# sun in the shadow pass and lay a straight-edged shadow across itself.
+	_card.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	vp_l.add_child(_card)
 	_ring = MeshInstance3D.new()
 	_ring.name = "Ring"

@@ -10,6 +10,7 @@ extends RefCounted
 
 const PictureRes := preload("res://addons/wuifwoud/species/forest_picture.gd")
 const BuildRes := preload("res://addons/wuifwoud/species/forest_pack_build.gd")
+const BakerRes := preload("res://addons/wuifwoud/species/forest_impostor_baker.gd")
 const TreeFix := preload("res://addons/wuifwoud/tests/fixtures/tree_fixture.gd")
 const ROOT := "user://wf_e1_picture"
 
@@ -82,6 +83,17 @@ static func run() -> Dictionary:
 	var pic := Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)
 	ResourceSaver.save(pic, dir.path_join("W_A_picture.res"))
 	_chk(r, "with its picture it is built", String(BuildRes.state_of(pack.species[0], dir, baked)["state"]) == "built")
+	# Impostor sheets from a bake before the trimmed card and the depth sheet: a build gives it both.
+	baked["species"]["W_A"]["span"] = 12.0
+	st = BuildRes.state_of(pack.species[0], dir, baked)
+	_chk(r, "sheets from a bake before trimming and depth need building (%s)" % str(st),
+		String(st["state"]) == "needs" and String(st["why"]) == "its impostor has no trim or depth sheet yet")
+	baked["bake"] = BakerRes.settings()
+	st = BuildRes.state_of(pack.species[0], dir, baked)
+	_chk(r, "and so do they while its trim and depth files are missing (%s)" % str(st), String(st["state"]) == "needs")
+	ResourceSaver.save(pic, dir.path_join("W_A_trim.res"))
+	ResourceSaver.save(pic, dir.path_join("W_A_depth.res"))
+	_chk(r, "with both it is built", String(BuildRes.state_of(pack.species[0], dir, baked)["state"]) == "built")
 
 	# ── a removed species' picture goes with it ──
 	ResourceSaver.save(pic, dir.path_join("W_B_picture.res"))

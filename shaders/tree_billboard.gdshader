@@ -92,6 +92,37 @@ uniform float alpha_cut : hint_range(0.0, 1.0) = 0.35;
 // lift belongs on the TREE's axis, the quad's span on the card's, so they are applied
 // separately in vertex().
 uniform float card_pivot_h = 0.0;
+// THE TRIMMED CARD (ForestImpostorBaker.trim_of). A view's silhouette fills a fraction
+// of the bake's square, and every texel outside it was rasterised, shaded up to the
+// first cut below and discarded. With a trim the mesh is a strip of `trim_bands`
+// horizontal bands (ForestAssets._card_strip) and vertex() pulls each row in to what the
+// three blended frames reach there: the conservative union, so no texel the cut keeps
+// is ever outside it. `impostor_trim` is RG8, a row a view and a mip set, column 0 the
+// view's vertical reach and column 1 + k band k's horizontal one, in `sil` units; the
+// set is picked by the card's size on screen (`trim_tile` texels a tile). `card_span`
+// is the card's square in mesh units, the strip's own size. 0 bands: the plain quad.
+// `alpha_cut` and `alpha_mip_scale` above are what the trim was measured against
+// (ForestImpostorBaker TRIM_CUT, half the cut for the WF_A2C variant's, and
+// TRIM_MIP_SCALE): lowering either draws texels it trimmed away.
+uniform sampler2D impostor_trim : filter_nearest, repeat_disable;
+// THE DEPTH SHEET (ForestImpostorBaker channel 2): per texel, how far the surface stands
+// in front of the frame's centre plane, in span units, premultiplied as (depth/range +
+// 0.5) x coverage in R and coverage in G. `depth_range` is DEPTH_RANGE; 0: no sheet,
+// and the frames are reprojected on their planes alone (see frame_setup).
+uniform sampler2D impostor_depth : filter_linear_mipmap, repeat_disable;
+uniform float depth_range = 0.0;
+// THE DEPTH IS READ BLURRED, this many mip levels coarser than the albedo (and never
+// finer than the level after it). One parallax step reads the depth where the ray meets
+// the frame's plane, and beside a thin branch that is background: depth 0, the step
+// misses the branch, and three frames missing it three ways leave it in dots under the
+// cut (measured on the starter pack's dead tree). The sheet is premultiplied, so a
+// coarse texel's depth / coverage is the mean depth of the surface around it: the hole
+// beside a branch reads the branch's depth, and the whole branch steps together.
+uniform float depth_blur_lod : hint_range(0.0, 5.0) = 2.0;
+uniform int trim_bands = 0;
+uniform int trim_sets = 0;
+uniform float trim_tile = 128.0;
+uniform float card_span = 0.0;
 
 group_uniforms shading;
 // THE CARD IS SHADED AS A CROWN, NOT AS A PLATE, and this block is the whole of it.
@@ -180,16 +211,23 @@ uniform float thin_max = 0.0;
 uniform bool thin_compensate = false;
 instance uniform float card_keep = -1.0;
 
-varying vec2 sil;            // silhouette UV: x across (0..1), y base→top (0..1)
-varying flat vec2 tile_a;    // atlas offsets of the three blended frames
-varying flat vec2 tile_b;
-varying flat vec2 tile_c;
-varying flat vec3 tile_w;    // their barycentric weights
-varying flat float has_ring; // 1 when a baked view grid resolved
-varying float vdist;         // instance distance to the MAIN camera, for the crossfades
-varying flat vec2 near_band; // this tree's own hand-over sub-band, from wf_tree_band
-varying flat vec2 far_band;  // and its own far dissolve
-varying flat float px_gone;  // 0 = full size on screen .. 1 = at the screen-size floor
+// VARYINGS ARE PACKED, four floats a location. Each varying is a location of its own
+// whatever its size, Godot's own spatial varyings take most of the 32 a GPU may offer,
+// and this shader's ran out (33 used, the depth sheet's frames added). vertex() and
+// fragment() work on locals under the names below and pack / unpack them at their ends.
+//   sil        silhouette UV: x across (0..1), y base→top (0..1)
+//   tile_a..c  atlas offsets of the three blended frames; tile_w their barycentric weights
+//   has_ring   1 when a baked view grid resolved
+//   vdist      instance distance to the MAIN camera, for the crossfades
+//   near_band  this tree's own hand-over sub-band, from wf_tree_band; far_band its far dissolve
+//   px_gone    0 = full size on screen .. 1 = at the screen-size floor
+varying vec4 v_sil_fc;       // sil, fuv_c
+varying float vdist;
+varying flat vec4 v_tiles_ab; // tile_a, tile_b
+varying flat vec4 v_tc_near;  // tile_c, near_band
+varying flat vec4 v_far_kc;   // far_band, fk_c
+varying flat vec4 v_w_ring;   // tile_w, has_ring
+varying flat vec4 v_zr_gone;  // fzr, px_gone
 // The card's basis in VIEW space, for the crown dome in fragment(). VIEW space because
 // that is the space `NORMAL` is in when written from fragment(), and it has to be
 // written there, not in vertex(), because the whole point is a normal that VARIES
@@ -197,8 +235,134 @@ varying flat float px_gone;  // 0 = full size on screen .. 1 = at the screen-siz
 varying flat vec3 vx_right;
 varying flat vec3 vx_up;
 varying flat vec3 vx_face;
+// EACH FRAME SAMPLED WHERE IT SEES THIS PIXEL (frame_setup). Per frame: where the pixel's
+// view ray meets that frame's centre plane, in its own tile (sil units), and how far one
+// span of baked depth moves the hit across its tile; then the depth reach the shift is
+// clamped to (the trim's bound, so a trimmed card still holds everything it draws).
+// Packed two frames a varying: frames a and b in xy and zw (c rides with sil and far_band
+// above; fzr with px_gone).
+varying vec4 fuv_ab;
+varying flat vec4 fk_ab;
+
+// The union of column `c`'s reach (lo, hi) over the blended frames `views` of trim row
+// block `r0`, skipping a frame of zero weight (it draws nothing). Empty: lo > hi, and
+// the trim sheet's empty (1, 0) never widens a union.
+vec2 trim_reach(int c, int r0, ivec3 views, vec3 w) {
+	vec2 u = vec2(1.0, 0.0);
+	if (w.x > 0.0) {
+		vec2 e = texelFetch(impostor_trim, ivec2(c, r0 + views.x), 0).rg;
+		u = vec2(min(u.x, e.x), max(u.y, e.y));
+	}
+	if (w.y > 0.0) {
+		vec2 e = texelFetch(impostor_trim, ivec2(c, r0 + views.y), 0).rg;
+		u = vec2(min(u.x, e.x), max(u.y, e.y));
+	}
+	if (w.z > 0.0) {
+		vec2 e = texelFetch(impostor_trim, ivec2(c, r0 + views.z), 0).rg;
+		u = vec2(min(u.x, e.x), max(u.y, e.y));
+	}
+	return u;
+}
+
+// THE FRAMES' OWN GEOMETRY. Each frame was baked by an orthographic camera looking
+// along its direction, so a point X of the tree lands in its tile at
+// 0.5 + ((X - C).Xf, (X - C).Yf) / span and sits (X - C).Zf / span in front of its centre
+// plane (C the tile's centre, Xf/Yf/Zf the frame camera's basis: wf_frame_basis). Sampling
+// every frame at the CARD's own coordinate, as this card used to, is right only for the
+// frame that looks exactly along the view: the others are a few degrees off, their
+// texels sit elsewhere, and a blend of three of them is a double image ("ghosting"), and
+// a frame's in-plane roll (the overhead frames', a banking camera's) turned the image
+// with the camera.
+//
+// Here the card point P = C + span (R (s.x - 0.5) + U (s.y - 0.5)) is seen along -F (F the
+// direction to the camera, R/U the card's axes). Its ray meets frame f's centre plane at
+// uv0 = 0.5 + A (s - 0.5), A = B - k n^T, with B the card axes in the frame's (R.Xf ...),
+// n = (R.Zf, U.Zf) and k = (F.Xf, F.Yf) / F.Zf; and a surface z spans in front of that
+// plane is hit at uv0 + z k. Affine in s, so the vertex stage computes uv0 and the
+// rasteriser interpolates it exactly; the fragment reads z at uv0 and steps once.
+void frame_setup(vec2 tile, mat3 tb, vec3 r, vec3 u, vec3 f, out mat2 a, out vec2 k) {
+	mat3 fm = tb * wf_frame_basis(wf_hemi_oct_dir(tile / float(max(impostor_grid - 1, 1))));
+	mat2 b = mat2(vec2(dot(r, fm[0]), dot(r, fm[1])), vec2(dot(u, fm[0]), dot(u, fm[1])));
+	vec2 n = vec2(dot(r, fm[2]), dot(u, fm[2]));
+	k = vec2(dot(f, fm[0]), dot(f, fm[1])) / max(dot(f, fm[2]), 0.2);
+	a = b - outerProduct(k, n);
+}
+
+// How far, in card units along x and y, frame f's texels can land from where its own
+// tile has them: s = 0.5 + A^-1 (u - 0.5 - z k), so |s - u| <= |(A^-1 - I)(u - 0.5)|
+// + |A^-1 k| |z|, with |u - 0.5| <= 0.5 a component and |z| <= `zr`. The trim widens
+// by it. A frame seen nearly edge-on (a small determinant) has no useful bound.
+vec2 frame_margin(mat2 a, vec2 k, float zr) {
+	if (abs(determinant(a)) < 0.3) {
+		return vec2(1.0);
+	}
+	mat2 ai = inverse(a);
+	mat2 d = ai - mat2(1.0);
+	vec2 sk = abs(ai * k) * zr;
+	return vec2((abs(d[0].x) + abs(d[1].x)) * 0.5 + sk.x, (abs(d[0].y) + abs(d[1].y)) * 0.5 + sk.y);
+}
+
+// Where this strip vertex sits on the card, in `sil` units: row `k` of `trim_bands`,
+// side 0 left / 1 right, pulled in to what the blended frames `views` (weights `w`)
+// reach. `tile_px` is the bake's tile on screen in pixels, `m` the frames' margin
+// (frame_margin): their texels can land that far from where their tiles hold them.
+//
+// WHICH MIP SET. The hardware samples level log2(trim_tile / tile_px) (the card faces
+// the camera, so the footprint is isotropic) and its trilinear neighbour; set s holds
+// mips 0 .. s + 2, so taking s half a level BELOW the estimate leaves the hardware half a
+// level of headroom above it, and every finer level (a negative mip bias under TAA or
+// FSR) is in the set already. A card too small for the last set folds to the plain
+// square: one band holds it and the others collapse onto its foot, where their
+// triangles have no area.
+//
+// WHICH ROW. A row's y is its band edge clamped to the frames' vertical reach (rows past
+// it fold onto it), its width the union of the bands it joins: each band's trapezoid
+// then contains its own reach at both edges, so it contains the silhouette. With a
+// margin, the bands that can land on the row's two bands (those within m.y of them)
+// count, and every reach widens by the margin. Past TRIM_MARGIN (a frame a cell away
+// with deep parallax, the rolled overhead frames) the trim would save little: the card
+// folds to its square.
+const float TRIM_MARGIN = 0.125;
+vec2 trim_sil(int k, float side, float tile_px, ivec3 views, vec3 w, vec2 m) {
+	float lod = log2(max(trim_tile / max(tile_px, 1e-3), 1.0));
+	int tset = int(floor(max(lod - 0.5, 0.0)));
+	if (tset >= trim_sets || max(m.x, m.y) > TRIM_MARGIN) {
+		return vec2(side, k == trim_bands ? 1.0 : 0.0);
+	}
+	int r0 = tset * impostor_grid * impostor_grid;
+	vec2 yr = trim_reach(0, r0, views, w);
+	// Nothing there: every row on one point.
+	if (yr.x > yr.y) {
+		return vec2(0.5);
+	}
+	yr = vec2(max(yr.x - m.y, 0.0), min(yr.y + m.y, 1.0));
+	float kb = float(trim_bands);
+	int j0 = max(int(floor((float(max(k - 1, 0)) / kb - m.y) * kb)), 0);
+	int j1 = min(int(ceil((float(min(k + 1, trim_bands)) / kb + m.y) * kb)) - 1, trim_bands - 1);
+	vec2 xr = vec2(1.0, 0.0);
+	for (int j = j0; j <= j1; j++) {
+		vec2 e = trim_reach(j + 1, r0, views, w);
+		xr = vec2(min(xr.x, e.x), max(xr.y, e.y));
+	}
+	// An empty band: a row of no width at the middle.
+	xr = xr.x > xr.y ? vec2(0.5) : vec2(max(xr.x - m.x, 0.0), min(xr.y + m.x, 1.0));
+	return vec2(side < 0.5 ? xr.x : xr.y, clamp(float(k) / kb, yr.x, yr.y));
+}
 
 void vertex() {
+	// The packed varyings' locals (see the varyings), packed at the end.
+	vec2 sil;
+	vec2 tile_a;
+	vec2 tile_b;
+	vec2 tile_c;
+	vec3 tile_w;
+	float has_ring;
+	vec2 near_band;
+	vec2 far_band;
+	float px_gone;
+	vec2 fuv_c;
+	vec2 fk_c;
+	vec3 fzr;
 	vec3 inst = MODEL_MATRIX[3].xyz;
 	float sx = length(MODEL_MATRIX[0].xyz);
 	float sy = length(MODEL_MATRIX[1].xyz);
@@ -237,6 +401,15 @@ void vertex() {
 	tile_b = vec2(0.0);
 	tile_c = vec2(0.0);
 	tile_w = vec3(1.0, 0.0, 0.0);
+	mat2 fa_m = mat2(1.0);
+	mat2 fb_m = mat2(1.0);
+	mat2 fc_m = mat2(1.0);
+	vec2 fk_a = vec2(0.0);
+	vec2 fk_b = vec2(0.0);
+	fk_c = vec2(0.0);
+	fzr = vec3(0.0);
+	ivec3 views = ivec3(0);
+	vec2 trim_m = vec2(0.0);
 	if (impostor_grid > 0) {
 		vec3 lx = normalize(MODEL_MATRIX[0].xyz);
 		vec3 ly = normalize(MODEL_MATRIX[1].xyz);
@@ -257,6 +430,32 @@ void vertex() {
 		tile_b = clamp(tile_b, vec2(0.0), vec2(lim));
 		tile_c = clamp(tile_c, vec2(0.0), vec2(lim));
 		has_ring = 1.0;
+		int gi = impostor_grid;
+		views = ivec3(int(tile_a.y) * gi + int(tile_a.x), int(tile_b.y) * gi + int(tile_b.x),
+			int(tile_c.y) * gi + int(tile_c.x));
+		mat3 tb = mat3(lx, ly, lz);
+		frame_setup(tile_a, tb, right, up, to_cam, fa_m, fk_a);
+		frame_setup(tile_b, tb, right, up, to_cam, fb_m, fk_b);
+		frame_setup(tile_c, tb, right, up, to_cam, fc_m, fk_c);
+		// Each frame's depth reach: the trim's measure of it (column 0's B, in units of
+		// half the range) when there is one, else the whole range. No depth sheet: no shift.
+		if (depth_range > 0.0) {
+			fzr = vec3(depth_range * 0.5);
+			if (trim_bands > 0) {
+				fzr *= vec3(texelFetch(impostor_trim, ivec2(0, views.x), 0).b,
+					texelFetch(impostor_trim, ivec2(0, views.y), 0).b,
+					texelFetch(impostor_trim, ivec2(0, views.z), 0).b);
+			}
+		}
+		if (tile_w.x > 0.0) {
+			trim_m = max(trim_m, frame_margin(fa_m, fk_a, fzr.x));
+		}
+		if (tile_w.y > 0.0) {
+			trim_m = max(trim_m, frame_margin(fb_m, fk_b, fzr.y));
+		}
+		if (tile_w.z > 0.0) {
+			trim_m = max(trim_m, frame_margin(fc_m, fk_c, fzr.z));
+		}
 	}
 
 	// BAND, IN THE VERTEX STAGE. Inside the mesh band (before `cut`) or past `far_cut`
@@ -298,6 +497,19 @@ void vertex() {
 		VERTEX = vec3(0.0, 0.0, 1.0);
 		NORMAL = vec3(0.0, 0.0, 1.0);
 	} else {
+		// THE CARD'S OWN SHAPE: the quad's corners, or the trimmed strip's rows placed on
+		// this view (trim_sil), with `sil` following them so the atlas stays put under the
+		// moved vertices and the sway below bends along the rows.
+		vec2 local = VERTEX.xy;
+		if (trim_bands > 0 && has_ring > 0.5 && card_span > 0.0) {
+			// The tile's height on screen; an orthographic pass (the editor's) has no depth
+			// to divide by.
+			float depth = PROJECTION_MATRIX[3][3] > 0.5 ? 1.0 : max(-(VIEW_MATRIX * vec4(inst, 1.0)).z, 0.1);
+			float tile_px = card_span * sy * abs(PROJECTION_MATRIX[1][1]) * 0.5 * VIEWPORT_SIZE.y / depth;
+			int k = int(round((1.0 - UV.y) * float(trim_bands)));
+			sil = trim_sil(k, UV.x, tile_px, views, tile_w, trim_m);
+			local = (sil - vec2(0.5)) * card_span;
+		}
 		float cv = sil.y;
 		// THE CLOCK IS A STATE, NOT `TIME * rate`: see wf_common.gdshaderinc.
 		float t = wuifwoud_wind_phase;
@@ -309,7 +521,7 @@ void vertex() {
 		// Lift along the INSTANCE's up (the trunk), span along the CARD's axes.
 		vec3 inst_up = normalize(MODEL_MATRIX[1].xyz);
 		vec3 base = inst + inst_up * (card_pivot_h * sy);
-		vec3 world = base + right * (VERTEX.x * sx) + up * (VERTEX.y * sy) + sway * sy;
+		vec3 world = base + right * (local.x * sx) + up * (local.y * sy) + sway * sy;
 		// VIEW SPACE, both of them (skip_vertex_transform): this is the position Godot lights
 		// and shadows, so it has to be the one that is drawn.
 		VERTEX = (VIEW_MATRIX * vec4(world, 1.0)).xyz;
@@ -319,6 +531,16 @@ void vertex() {
 		// card's brightness track the CAMERA rather than the sun.
 		NORMAL = vx_face;
 	}
+	// Each frame's plane hit for this vertex's place on the card (frame_setup).
+	fuv_ab = vec4(vec2(0.5) + fa_m * (sil - vec2(0.5)), vec2(0.5) + fb_m * (sil - vec2(0.5)));
+	fuv_c = vec2(0.5) + fc_m * (sil - vec2(0.5));
+	fk_ab = vec4(fk_a, fk_b);
+	v_sil_fc = vec4(sil, fuv_c);
+	v_tiles_ab = vec4(tile_a, tile_b);
+	v_tc_near = vec4(tile_c, near_band);
+	v_far_kc = vec4(far_band, fk_c);
+	v_w_ring = vec4(tile_w, has_ring);
+	v_zr_gone = vec4(fzr, px_gone);
 }
 
 // One G-buffer normal tap into the TREE's space: the bake stored x/y of the normal in
@@ -332,7 +554,38 @@ vec3 frame_normal(vec2 tile, vec4 px) {
 	return wf_frame_basis(wf_hemi_oct_dir(tile / float(max(impostor_grid - 1, 1)))) * nv;
 }
 
+// Frame `tile`'s atlas UV for this pixel: its plane hit `u0` stepped by the depth it
+// baked around there (`k` per span, clamped to the frame's reach `zr`; read
+// `depth_blur_lod` levels above `lod`, the albedo's level), and 1 in z when the hit
+// lies on the tile (off it the frame has nothing: the tree is inside every tile). The
+// depth is read at the plane hit, one step, the usual parallax trade.
+vec3 frame_uv(vec2 tile, vec2 u0, vec2 k, float zr, float lod) {
+	vec2 grid = vec2(float(impostor_cols), float(impostor_rows));
+	vec2 u = u0;
+	if (depth_range > 0.0) {
+		vec2 d = textureLod(impostor_depth, (tile + clamp(vec2(u0.x, 1.0 - u0.y), 0.002, 0.998)) / grid,
+			max(lod, 0.0) + depth_blur_lod).rg;
+		float z = d.y > 0.03 ? clamp((d.x / d.y - 0.5) * depth_range, -zr, zr) : 0.0;
+		u += z * k;
+	}
+	float inside = step(0.0, u.x) * step(u.x, 1.0) * step(0.0, u.y) * step(u.y, 1.0);
+	return vec3((tile + clamp(vec2(u.x, 1.0 - u.y), 0.002, 0.998)) / grid, inside);
+}
+
 void fragment() {
+	// The packed varyings, unpacked (see the varyings).
+	vec2 sil = v_sil_fc.xy;
+	vec2 fuv_c = v_sil_fc.zw;
+	vec2 tile_a = v_tiles_ab.xy;
+	vec2 tile_b = v_tiles_ab.zw;
+	vec2 tile_c = v_tc_near.xy;
+	vec2 near_band = v_tc_near.zw;
+	vec2 far_band = v_far_kc.xy;
+	vec2 fk_c = v_far_kc.zw;
+	vec3 tile_w = v_w_ring.xyz;
+	float has_ring = v_w_ring.w;
+	vec3 fzr = v_zr_gone.xyz;
+	float px_gone = v_zr_gone.w;
 	float v = sil.y;            // 0 base .. 1 top
 	vec3 col;
 	float a;
@@ -349,33 +602,51 @@ void fragment() {
 		// on two premultiplied sheets: blend first, divide by the blended coverage after,
 		// which is what premultiplied data is for: a frame that is empty at this texel
 		// then simply contributes nothing instead of black.
+		//
+		// EACH FRAME AT ITS OWN UV (frame_uv): where it saw this pixel's surface. The
+		// gradients are the plane hits', which are smooth: the depth step jumps where the
+		// baked depth does, and its own derivatives there would throw the sampler onto a
+		// coarse mip in a seam through the crown.
 		vec2 grid = vec2(float(impostor_cols), float(impostor_rows));
-		vec2 tuv = clamp(vec2(sil.x, 1.0 - sil.y), 0.002, 0.998);
-		vec2 ua = (tile_a + tuv) / grid;
-		vec2 ub = (tile_b + tuv) / grid;
-		vec2 uc = (tile_c + tuv) / grid;
-		vec4 pa = texture(impostor_albedo, ua);
-		vec4 pb = texture(impostor_albedo, ub);
-		vec4 pc = texture(impostor_albedo, uc);
-		vec4 pm = pa * tile_w.x + pb * tile_w.y + pc * tile_w.z;
+		vec2 fuv_a = fuv_ab.xy;
+		vec2 fuv_b = fuv_ab.zw;
+		// The level the albedo is sampled at (the plane hit's footprint, as textureGrad is given
+		// below); the depth is read depth_blur_lod above it.
+		vec2 tuv0 = clamp(vec2(fuv_a.x, 1.0 - fuv_a.y), 0.002, 0.998);
+		float lod0 = textureQueryLod(impostor_albedo, (tile_a + tuv0) / grid).y;
+		vec3 ua = frame_uv(tile_a, fuv_a, fk_ab.xy, fzr.x, lod0);
+		vec3 ub = frame_uv(tile_b, fuv_b, fk_ab.zw, fzr.y, lod0);
+		vec3 uc = frame_uv(tile_c, fuv_c, fk_c, fzr.z, lod0);
+		vec2 ga_x = dFdx(vec2(fuv_a.x, -fuv_a.y)) / grid;
+		vec2 ga_y = dFdy(vec2(fuv_a.x, -fuv_a.y)) / grid;
+		vec2 gb_x = dFdx(vec2(fuv_b.x, -fuv_b.y)) / grid;
+		vec2 gb_y = dFdy(vec2(fuv_b.x, -fuv_b.y)) / grid;
+		vec2 gc_x = dFdx(vec2(fuv_c.x, -fuv_c.y)) / grid;
+		vec2 gc_y = dFdy(vec2(fuv_c.x, -fuv_c.y)) / grid;
+		// A frame whose hit is off its tile has nothing there.
+		vec3 fw = tile_w * vec3(ua.z, ub.z, uc.z);
+		vec4 pa = textureGrad(impostor_albedo, ua.xy, ga_x, ga_y);
+		vec4 pb = textureGrad(impostor_albedo, ub.xy, gb_x, gb_y);
+		vec4 pc = textureGrad(impostor_albedo, uc.xy, gc_x, gc_y);
+		vec4 pm = pa * fw.x + pb * fw.y + pc * fw.z;
 		a = pm.a;
 		if (a < 0.004) discard;
 		col = wf_srgb_to_linear(clamp(pm.rgb / a, 0.0, 1.0));
 #ifdef WF_A2C
 		a_raw = a;
-		aa_uv = ua * vec2(textureSize(impostor_albedo, 0));
+		aa_uv = ua.xy * vec2(textureSize(impostor_albedo, 0));
 #endif
-		a *= 1.0 + max(textureQueryLod(impostor_albedo, ua).y, 0.0) * alpha_mip_scale;
-		vec4 na = texture(impostor_normal, ua);
-		vec4 nb = texture(impostor_normal, ub);
-		vec4 nc = texture(impostor_normal, uc);
-		float wa = tile_w.x * na.a;
-		float wb = tile_w.y * nb.a;
-		float wc = tile_w.z * nc.a;
+		a *= 1.0 + max(lod0, 0.0) * alpha_mip_scale;
+		vec4 na = textureGrad(impostor_normal, ua.xy, ga_x, ga_y);
+		vec4 nb = textureGrad(impostor_normal, ub.xy, gb_x, gb_y);
+		vec4 nc = textureGrad(impostor_normal, uc.xy, gc_x, gc_y);
+		float wa = fw.x * na.a;
+		float wb = fw.y * nb.a;
+		float wc = fw.z * nc.a;
 		gb_n = frame_normal(tile_a, na) * wa + frame_normal(tile_b, nb) * wb
 			+ frame_normal(tile_c, nc) * wc;
 		float wsum = max(wa + wb + wc, 1e-4);
-		gb_trans = (na.b * tile_w.x + nb.b * tile_w.y + nc.b * tile_w.z) / wsum;
+		gb_trans = (na.b * fw.x + nb.b * fw.y + nc.b * fw.z) / wsum;
 	} else if (has_ring > 0.5) {
 		// Baked grid: the card spans exactly the world square the bake framed, so the
 		// silhouette UV is the tile UV with no fitting. A half-texel inset keeps

@@ -46,6 +46,21 @@
   `REPLACE`: a region the cache holds is not read again, and is never overwritten from its file. A pump let go with
   loads in flight still takes them. The main thread pays ~5 µs a load in flight a frame and ~20 µs to land one
   (measured: 64 regions, 100 µs a frame on average while they load).
+- Trimmed impostor cards: a built card is a strip of eight bands, each pulled in by the vertex shader to what the three
+  views it blends reach there, instead of the bake's whole square rasterised and mostly discarded. The pack build
+  measures the reach per view and per mip set on the stored albedo (`built/<id>_trim.res`,
+  `ForestImpostorBaker.trim_of`), conservatively: every texel the card's cut can keep stays inside. On the starter
+  pack's trees the strip covers 28-62 % of the square where the card is largest, 58-80 % farther out, against the
+  11-25 % the trees cover; a card under ~11 px draws its plain square.
+- Impostor cards sample each blended view where it saw the pixel: the view ray is met with each frame's own plane and
+  stepped by a baked depth sheet (the bake's third channel, `built/<id>_depth.res`, BC5, read a few mips blurred so
+  thin branches step together). From above and at steep angles the card no longer turns with the camera or sits off
+  the tree (the overhead frames' roll was ignored); side on it matches the model as before. The trim widens by each
+  frame's possible shift and folds to the square where that would save little. Varyings packed (the card shader had
+  reached 33 of 32).
+- A species whose impostor was baked before the trim and the depth sheet reads "needs" (its impostor has no trim or
+  depth sheet yet) and draws the plain square with no parallax until it is built again. The starter pack is rebuilt.
+- The Species dialog's card casts no shadow, as in the forest: it laid a straight-edged shadow across itself.
 - Trunk collider shares: `ForestSpawner.set_trunk_share(share)` ranks the collision group's members
   (`ForestTrunkPool.member_share`, a Callable returning `ForestTrunkPool.Share`). A PRIMARY member (every member when
   unset, as before) keeps the trunks within `radius_m`; a SECONDARY member gets the trunks within `secondary_radius_m`
