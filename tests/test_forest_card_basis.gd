@@ -80,4 +80,10 @@ static func run() -> Dictionary:
 			src.contains("cross(tree_up, to_cam)") and src.contains("smoothstep(0.17, 0.34, tl)"))
 	_chk(r, "an orthographic pass (a shadow cascade) faces along the camera's back axis",
 			src.contains("PROJECTION_MATRIX[3][3] > 0.5") and src.contains("INV_VIEW_MATRIX[2].xyz"))
+	# fragment() has the MultiMesh NODE's MODEL_MATRIX, not the tree's: a normal turned by it misses the tree's yaw and
+	# a card turned 180 deg is lit from the far side (measured: yaw 135-225 lit from the shadow side). The tree's basis
+	# comes from vertex().
+	var frag := src.substr(src.find("\nvoid fragment()"))
+	_chk(r, "fragment() takes the tree's basis from vertex(), never MODEL_MATRIX",
+			frag.length() > 20 and not frag.contains("MODEL_MATRIX") and frag.contains("v_inst_x"))
 	return r

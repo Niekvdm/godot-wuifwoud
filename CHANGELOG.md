@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fix: impostor cards are lit from the sun's side whatever their tree's yaw. The card turned its baked normal to the
+  world with `MODEL_MATRIX` in `fragment()`, which there is the MultiMesh node's transform (the per-instance one only
+  reaches the vertex stage): every card was lit as if unrotated, so a tree turned 180 deg had its sunlit side facing
+  away (measured: yaw 135-225 brighter on the shadow side, in every build back to before the trimmed cards). The tree's
+  basis now comes from `vertex()`.
 - The pack build notices two more changes that need a species built again (and its impostor baked again):
   - a file moved to another role (the same texture as the foliage's instead of the bark's, say): built.json now records
     which file plays which part (`roles`); an entry built before keeps its build until its next one records them;

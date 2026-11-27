@@ -243,6 +243,11 @@ varying flat vec3 vx_face;
 // above; fzr with px_gone).
 varying vec4 fuv_ab;
 varying flat vec4 fk_ab;
+// THE TREE'S OWN BASIS (x and up, unit; z is their cross), for fragment(). MODEL_MATRIX there is the MultiMesh
+// NODE's transform: the per-instance transform is applied in the vertex stage only, so a normal turned to world by
+// it never takes the tree's own yaw, and a card turned 180 deg was lit from the far side.
+varying flat vec3 v_inst_x;
+varying flat vec3 v_inst_y;
 
 // The union of column `c`'s reach (lo, hi) over the blended frames `views` of trim row
 // block `r0`, skipping a frame of zero weight (it draws nothing). Empty: lo > hi, and
@@ -364,6 +369,8 @@ void vertex() {
 	vec2 fk_c;
 	vec3 fzr;
 	vec3 inst = MODEL_MATRIX[3].xyz;
+	v_inst_x = normalize(MODEL_MATRIX[0].xyz);
+	v_inst_y = normalize(MODEL_MATRIX[1].xyz);
 	float sx = length(MODEL_MATRIX[0].xyz);
 	float sy = length(MODEL_MATRIX[1].xyz);
 	vec3 cam = INV_VIEW_MATRIX[3].xyz;              // the card FACES the pass's camera
@@ -755,7 +762,7 @@ void fragment() {
 		// transmission weight (the bake scaled tree_wind's mix(0.35, 1.35, depth) by
 		// 1/1.35). No ambient AO: the mesh has one only from a pack AO map, and none of
 		// the dome's guesses below are needed.
-		vec3 n_w = normalize(mat3(MODEL_MATRIX) * gb_n);
+		vec3 n_w = normalize(mat3(v_inst_x, v_inst_y, cross(v_inst_x, v_inst_y)) * gb_n);
 		NORMAL = normalize((VIEW_MATRIX * vec4(n_w, 0.0)).xyz);
 		ALBEDO = col * COLOR.rgb;
 		BACKLIGHT = backlight_col * (1.35 * gb_trans);
