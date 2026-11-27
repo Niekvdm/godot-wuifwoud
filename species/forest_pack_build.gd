@@ -27,6 +27,8 @@ const SpeciesRes := preload("res://addons/wuifwoud/species/forest_species.gd")
 const BuiltRes := preload("res://addons/wuifwoud/species/forest_built_species.gd")
 ## The impostor baker.
 const BakerRes := preload("res://addons/wuifwoud/species/forest_impostor_baker.gd")
+## The filled leaf sheets.
+const LeafRes := preload("res://addons/wuifwoud/species/forest_leaf_sheet.gd")
 ## The far palette (its mean colour).
 const PaletteRes := preload("res://addons/wuifwoud/forest_far_palette.gd")
 ## The species' picture.
@@ -58,6 +60,7 @@ var _finished_n := 0         # species of _todo landed or failed
 ## species in that folder (two packs in one folder share its built/), and what they hold now.
 var _ids_of := {}
 var _manifests := {}         # built dir -> its built.json as this build writes it
+var _leaves := {}            # built dir -> {leaf file -> its texture}: each sheet made once a build and folder
 var _current := {}           # the prepared species the baker has
 ## The stores in flight, oldest first: [{"r": the prepared species, "task": its worker task, "out": what the worker
 ## writes, read only once the task is done}].
@@ -154,6 +157,10 @@ static func state_of(s, dir: String, man: Dictionary) -> Dictionary:
 				or not FileAccess.file_exists(dir.path_join(id + "_trim.res")) \
 				or not FileAccess.file_exists(dir.path_join(id + "_depth.res")):
 			return {"state": "needs", "why": "its impostor has no trim or depth sheet yet"}
+		var fol := SpeciesRes.resolve(String(s.foliage_albedo))
+		var lf := String(e.get("leaf", ""))
+		if fol != "" and (lf != LeafRes.file_for(fol) or not FileAccess.file_exists(dir.path_join(lf))):
+			return {"state": "needs", "why": "its leaves have no filled sheet yet"}
 	var src: Dictionary = e.get("sources", {})
 	var files: PackedStringArray = s.files()
 	for f in src:
@@ -359,14 +366,42 @@ func _prepare(t: Dictionary) -> void:
 	r["inputs"] = s.build_inputs()
 	# A bush is baked too: it has no card, but the far forest's palette colours a bush-only forest type from its bake.
 	if _baked:
+		# The filled leaf sheet first, so the bake samples what the mesh trees will (ForestLeafSheet).
+		var leaf := _leaf_sheet(s, t["dir"], r)
 		var mesh: ArrayMesh = p["combined"]
-		AssetsRes._dress(s, mesh, p, false)
+		AssetsRes._dress(s, mesh, p, false, leaf)
 		if _baker.begin(mesh):
 			_picture.begin(mesh)
 			_current = r
 			_set_progress("bake", id, _todo.size())
 			return
 	_land(r, {"baked": _baked})
+
+
+## Species `s`'s filled leaf sheet for built folder `dir`: made and staged once a build per source sheet (species
+## share them), its file named in `r` ("leaf") for the landing; null when it names no foliage sheet or it will not
+## load (it then draws its source, as before), with a warning when the fill or the save fails.
+func _leaf_sheet(s, dir: String, r: Dictionary) -> Texture2D:
+	var src := SpeciesRes.resolve(String(s.foliage_albedo))
+	if src == "" or not ResourceLoader.exists(src):
+		return null
+	var f := LeafRes.file_for(src)
+	if not _leaves.has(dir):
+		_leaves[dir] = {}
+	var made: Dictionary = _leaves[dir]
+	if not made.has(f):
+		var tex := load(src) as Texture2D
+		var img := LeafRes.store(LeafRes.fill(tex.get_image() if tex != null else null))
+		var err := _save_sheet(img, _stage(dir).path_join(f)) if img != null else FAILED
+		made[f] = ImageTexture.create_from_image(img) if err == OK else null
+		if err != OK:
+			var w: PackedStringArray = r["warnings"]
+			w.append("its leaf sheet could not be filled or saved (%s)" % error_string(err))
+			r["warnings"] = w
+	if made[f] == null:
+		return null
+	r["leaf"] = f
+	return made[f]
 
 
 ## The store worker: the sheets premultiplied, sized, mipmapped and BC7-compressed, the crown colour read from the
@@ -464,6 +499,15 @@ func _land(r: Dictionary, b: Dictionary) -> void:
 		if FileAccess.file_exists(dst.path_join(f)):
 			DirAccess.remove_absolute(dst.path_join(f))
 		DirAccess.rename_absolute(stage.path_join(f), dst.path_join(f))
+	# The leaf sheet is shared: the first species of this build to land with it moves it in, the rest find it there.
+	var leaf := String(r.get("leaf", ""))
+	if leaf != "":
+		if FileAccess.file_exists(stage.path_join(leaf)):
+			if FileAccess.file_exists(dst.path_join(leaf)):
+				DirAccess.remove_absolute(dst.path_join(leaf))
+			DirAccess.rename_absolute(stage.path_join(leaf), dst.path_join(leaf))
+		if not FileAccess.file_exists(dst.path_join(leaf)):
+			leaf = ""
 	var inputs: Dictionary = r.get("inputs", {})
 	var e := {"prep_version": AssetsRes.PREP_VERSION, "pack": String(r.get("pack", "")), "sources": r.get("sources", {}),
 		"settings": inputs.get("settings", ""), "roles": inputs.get("roles", ""), "imports": inputs.get("imports", {}),
@@ -477,6 +521,8 @@ func _land(r: Dictionary, b: Dictionary) -> void:
 		e["crown_colour"] = [c.r, c.g, c.b] if c is Color else null
 	if pictured:
 		e["picture"] = true
+	if leaf != "":
+		e["leaf"] = leaf
 	var man: Dictionary = _manifests.get(dir, {})
 	if _baked:
 		man["bake"] = BakerRes.settings()
@@ -485,6 +531,7 @@ func _land(r: Dictionary, b: Dictionary) -> void:
 	(man["species"] as Dictionary)[id] = e
 	_manifests[dir] = man
 	_write_manifest(dir, man)
+	prune_leaves(dir, man)
 	(_out["built"] as Array).append(id)
 	if not warnings.is_empty():
 		(_out["warnings"] as Dictionary)[id] = Array(warnings)
@@ -513,6 +560,21 @@ func _fail(r: Dictionary, why: String) -> void:
 	(_out["failed"] as Dictionary)[r["id"]] = why
 	_discard(r)
 	_finished_n += 1
+
+
+## The leaf sheets in built folder `dir` that no species of its built.json `man` names any more: deleted.
+static func prune_leaves(dir: String, man: Dictionary) -> void:
+	var g := ProjectSettings.globalize_path(dir)
+	if not DirAccess.dir_exists_absolute(g):
+		return
+	var named := {}
+	for id in (man.get("species", {}) as Dictionary):
+		var e = man["species"][id]
+		if e is Dictionary and String(e.get("leaf", "")) != "":
+			named[String(e["leaf"])] = true
+	for f in DirAccess.get_files_at(g):
+		if f.begins_with("leaf_") and f.ends_with(".res") and not named.has(f):
+			DirAccess.remove_absolute(g.path_join(f))
 
 
 ## A species that does not land: its staged files deleted.
@@ -588,6 +650,7 @@ func _end() -> bool:
 				(_out["removed"] as Array).append(id)
 			if not gone.is_empty():
 				_write_manifest(dir, man)
+				prune_leaves(dir, man)
 	for dir in _manifests:
 		var stage := _stage(dir)
 		if DirAccess.dir_exists_absolute(stage):

@@ -11,6 +11,7 @@ extends RefCounted
 const PictureRes := preload("res://addons/wuifwoud/species/forest_picture.gd")
 const BuildRes := preload("res://addons/wuifwoud/species/forest_pack_build.gd")
 const BakerRes := preload("res://addons/wuifwoud/species/forest_impostor_baker.gd")
+const LeafRes := preload("res://addons/wuifwoud/species/forest_leaf_sheet.gd")
 const TreeFix := preload("res://addons/wuifwoud/tests/fixtures/tree_fixture.gd")
 const ROOT := "user://wf_e1_picture"
 
@@ -94,6 +95,19 @@ static func run() -> Dictionary:
 	ResourceSaver.save(pic, dir.path_join("W_A_trim.res"))
 	ResourceSaver.save(pic, dir.path_join("W_A_depth.res"))
 	_chk(r, "with both it is built", String(BuildRes.state_of(pack.species[0], dir, baked)["state"]) == "built")
+	# A species with a foliage sheet and no filled leaf sheet needs building (ForestLeafSheet).
+	var leaf_src := ROOT.path_join("leaves.res")
+	ResourceSaver.save(ImageTexture.create_from_image(pic), leaf_src)
+	pack.species[0].foliage_albedo = leaf_src
+	st = BuildRes.state_of(pack.species[0], dir, baked)
+	_chk(r, "a foliage sheet without its filled leaf sheet needs building (%s)" % str(st),
+		String(st["state"]) == "needs" and String(st["why"]) == "its leaves have no filled sheet yet")
+	var lf := LeafRes.file_for(leaf_src)
+	ResourceSaver.save(pic, dir.path_join(lf))
+	baked["species"]["W_A"]["leaf"] = lf
+	st = BuildRes.state_of(pack.species[0], dir, baked)
+	_chk(r, "with it, the leaves ask for nothing more (%s)" % str(st), String(st["why"]) != "its leaves have no filled sheet yet")
+	pack.species[0].foliage_albedo = ""
 
 	# ── a removed species' picture goes with it ──
 	ResourceSaver.save(pic, dir.path_join("W_B_picture.res"))

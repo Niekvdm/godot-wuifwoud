@@ -1171,12 +1171,18 @@ static func _species_materials(mesh_name: String) -> Array:
 ## Species `sp`'s materials on `mesh` (made at load, cheap): one wind ShaderMaterial a surface, bark or
 ## foliage by the preparation's classification, the crown's shape from it. `live`: the forest's, fed by its one wind
 ## feed (_live_materials); the pack build's bake dresses a mesh of its own with `live` off.
-static func _dress(sp, mesh: ArrayMesh, p: Dictionary, live: bool) -> void:
+##
+## `leaf`: the foliage surfaces' sheet; null takes the species' filled leaf sheet from its pack's build (leaf_at), or
+## its source texture when the build made none (ForestLeafSheet says why the filled one).
+static func _dress(sp, mesh: ArrayMesh, p: Dictionary, live: bool, leaf: Texture2D = null) -> void:
 	var name := String(sp.id) if sp != null else String(mesh.resource_name)
 	var foliage_list: PackedInt32Array = p["foliage"]
+	if leaf == null and sp != null:
+		var bd := built_dir_of(String(sp.id))
+		leaf = leaf_at(bd, String(sp.id), _manifest(bd))
 	for si in range(mesh.get_surface_count()):
 		var foliage := foliage_list.has(si)
-		var tex := _atlas_of(sp, foliage)
+		var tex := leaf if foliage and leaf != null else _atlas_of(sp, foliage)
 		var sm := ShaderMaterial.new()
 		sm.shader = _wind_shader_res()
 		# Named after its species so the spawner's per-material pushes (push_lod_params)
@@ -1534,7 +1540,7 @@ static func view_parts(sp, dir: String, man: Dictionary) -> Dictionary:
 	if not p.has("combined"):
 		return {}
 	var combined := (p["combined"] as ArrayMesh).duplicate() as ArrayMesh
-	_dress(sp, combined, p, false)
+	_dress(sp, combined, p, false, leaf_at(dir, id, man, true))
 	var levels := []
 	for m in p.get("levels", []):
 		var lm := (m as ArrayMesh).duplicate() as ArrayMesh
@@ -1588,6 +1594,24 @@ static func built_crown_colour(mesh_name: String) -> Array:
 	if typeof(c) == TYPE_ARRAY and (c as Array).size() >= 3:
 		return [Color(float(c[0]), float(c[1]), float(c[2]))]
 	return [null]
+
+
+## Species `id`'s filled leaf sheet from built folder `dir` (`man` its built.json), shared by every species of the
+## folder that names the same file; null when the build made none (an older build, a species without a foliage sheet).
+## Cached per file for the forest; `fresh` loads it anew (the Species dialog reads a build that may just have landed).
+static func leaf_at(dir: String, id: String, man: Dictionary, fresh := false) -> Texture2D:
+	if dir == "":
+		return null
+	var e: Dictionary = (man.get("species", {}) as Dictionary).get(id, {})
+	var f := String(e.get("leaf", ""))
+	var path := dir.path_join(f)
+	if f == "" or not ResourceLoader.exists(path):
+		return null
+	if fresh:
+		return _sheet(path)
+	if not _tex_cache.has(path):
+		_tex_cache[path] = _sheet(path)
+	return _tex_cache[path]
 
 
 ## The baked view ring of species `id` in built folder `dir` (`man` its built.json), or {} when that folder holds none:

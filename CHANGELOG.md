@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Mesh trees keep their colour with distance, so a tree no longer brightens when it hands over to its card. A leaf
+  texture's clear texels hold whatever colour was left there (the starter's broadleaf sheet: half the leaves'
+  brightness over three quarters of it) and mips average colour without weighting it by alpha, so a crown sank toward
+  that colour as it sampled coarser mips: CommonTree_3's green fell from 0.106 at 20 m to 0.046 at 160 m while its card
+  held 0.104. The pack build now writes each foliage sheet once, filled (`ForestLeafSheet`: every clear texel takes the
+  colour of the leaves around it; alpha and covered texels untouched), as `built/leaf_<hash>.res`, shared by the
+  species that use it; the mesh trees and the bake sample it. Measured on the starter pack, card against mesh from 80 m
+  to 160 m: CommonTree_3 1.40-2.16x as bright before, 0.91-0.95x after; CommonTree_5 1.44-2.14x before, 0.91-0.99x;
+  pines 0.90-1.03x. A species built before reads "needs" (its leaves have no filled sheet yet) and draws its source
+  sheet until it is built again.
 - Fix: impostor cards are lit from the sun's side whatever their tree's yaw. The card turned its baked normal to the
   world with `MODEL_MATRIX` in `fragment()`, which there is the MultiMesh node's transform (the per-instance one only
   reaches the vertex stage): every card was lit as if unrotated, so a tree turned 180 deg had its sunlit side facing
