@@ -15,9 +15,9 @@
   "species": {
     "WW_Bush_Common": {
       "crown_colour": [
-        0.28030329942703247,
-        0.005407251883298159,
-        0.003970000892877579
+        0.2818777859210968,
+        0.005001781973987818,
+        0.0034720597323030233
       ],
       "h": 1.5817856788635254,
       "imports": {
@@ -25,6 +25,7 @@
         "res://addons/wuifwoud/packs/starter/meshes/Bush_Common.gltf": "475f445f0d055a89e25827e6644719e8",
         "res://addons/wuifwoud/packs/starter/meshes/Leaves_TwistedTree_C.png": "7256ffdde33f9d884d47fffe4ec9a5f6"
       },
+      "leaf": "leaf_77cb09069fb0.res",
       "pack": "starter.tres",
       "picture": true,
       "prep_version": 1,
@@ -55,9 +56,9 @@
     },
     "WW_CommonTree_3": {
       "crown_colour": [
-        0.1007390022277832,
-        0.1366245150566101,
-        0.003849835367873311
+        0.10233394801616669,
+        0.13718070089817047,
+        0.00383415212854743
       ],
       "h": 9.425189971923828,
       "imports": {
@@ -67,6 +68,7 @@
         "res://addons/wuifwoud/packs/starter/meshes/CommonTree_3.gltf": "475f445f0d055a89e25827e6644719e8",
         "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png": "7256ffdde33f9d884d47fffe4ec9a5f6"
       },
+      "leaf": "leaf_c237593bfba7.res",
       "pack": "starter.tres",
       "picture": true,
       "prep_version": 1,
@@ -107,9 +109,9 @@
     },
     "WW_CommonTree_4": {
       "crown_colour": [
-        0.1327567845582962,
-        0.12668268382549286,
-        0.0101943239569664
+        0.13438202440738678,
+        0.1272091567516327,
+        0.010143199004232883
       ],
       "h": 9.43838119506836,
       "imports": {
@@ -119,6 +121,7 @@
         "res://addons/wuifwoud/packs/starter/meshes/CommonTree_4.gltf": "475f445f0d055a89e25827e6644719e8",
         "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png": "7256ffdde33f9d884d47fffe4ec9a5f6"
       },
+      "leaf": "leaf_c237593bfba7.res",
       "pack": "starter.tres",
       "picture": true,
       "prep_version": 1,
@@ -159,9 +162,9 @@
     },
     "WW_CommonTree_5": {
       "crown_colour": [
-        0.10863140225410461,
-        0.13954274356365204,
-        0.0046956357546150684
+        0.1091519296169281,
+        0.13886363804340363,
+        0.004667685367166996
       ],
       "h": 7.006239891052246,
       "imports": {
@@ -171,6 +174,7 @@
         "res://addons/wuifwoud/packs/starter/meshes/CommonTree_5.gltf": "475f445f0d055a89e25827e6644719e8",
         "res://addons/wuifwoud/packs/starter/meshes/Leaves_NormalTree_C.png": "7256ffdde33f9d884d47fffe4ec9a5f6"
       },
+      "leaf": "leaf_c237593bfba7.res",
       "pack": "starter.tres",
       "picture": true,
       "prep_version": 1,
@@ -257,9 +261,9 @@
     },
     "WW_Fern_1": {
       "crown_colour": [
-        0.0646858885884285,
-        0.18548542261123657,
-        0.013876669108867645
+        0.05649867653846741,
+        0.17620544135570526,
+        0.00898000318557024
       ],
       "h": 0.8402432203292847,
       "imports": {
@@ -267,6 +271,7 @@
         "res://addons/wuifwoud/packs/starter/meshes/Fern_1.gltf": "475f445f0d055a89e25827e6644719e8",
         "res://addons/wuifwoud/packs/starter/meshes/Leaves.png": "7256ffdde33f9d884d47fffe4ec9a5f6"
       },
+      "leaf": "leaf_9b58ca12f2cd.res",
       "pack": "starter.tres",
       "picture": true,
       "prep_version": 1,
@@ -297,9 +302,9 @@
     },
     "WW_Pine_4": {
       "crown_colour": [
-        0.03263326361775398,
-        0.07611303776502609,
-        0.0020300126634538174
+        0.03232310712337494,
+        0.0768064334988594,
+        0.002071699593216181
       ],
       "h": 10.236431121826172,
       "imports": {
@@ -309,6 +314,7 @@
         "res://addons/wuifwoud/packs/starter/meshes/Pine_4.bin": "",
         "res://addons/wuifwoud/packs/starter/meshes/Pine_4.gltf": "475f445f0d055a89e25827e6644719e8"
       },
+      "leaf": "leaf_2b994534978b.res",
       "pack": "starter.tres",
       "picture": true,
       "prep_version": 1,
@@ -349,9 +355,9 @@
     },
     "WW_Pine_5": {
       "crown_colour": [
-        0.027680501341819763,
-        0.0749610960483551,
-        0.0011929176980629563
+        0.027320168912410736,
+        0.07549723237752914,
+        0.0012150609400123358
       ],
       "h": 8.723807334899902,
       "imports": {
@@ -361,6 +367,7 @@
         "res://addons/wuifwoud/packs/starter/meshes/Pine_5.bin": "",
         "res://addons/wuifwoud/packs/starter/meshes/Pine_5.gltf": "475f445f0d055a89e25827e6644719e8"
       },
+      "leaf": "leaf_2b994534978b.res",
       "pack": "starter.tres",
       "picture": true,
       "prep_version": 1,
@@ -401,9 +408,9 @@
     },
     "WW_Plant_1_Big": {
       "crown_colour": [
-        0.18192152678966522,
-        0.23553860187530518,
-        0.006541012320667505
+        0.17746587097644806,
+        0.2319154590368271,
+        0.0050353603437542915
       ],
       "h": 2.3477659225463867,
       "imports": {
@@ -411,6 +418,7 @@
         "res://addons/wuifwoud/packs/starter/meshes/Plant_1_Big.bin": "",
         "res://addons/wuifwoud/packs/starter/meshes/Plant_1_Big.gltf": "475f445f0d055a89e25827e6644719e8"
       },
+      "leaf": "leaf_9b58ca12f2cd.res",
       "pack": "starter.tres",
       "picture": true,
       "prep_version": 1,
