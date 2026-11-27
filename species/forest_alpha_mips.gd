@@ -25,29 +25,34 @@ static func preserve(img: Image, cut: float, tiles := 1, premultiplied := false)
 		return null
 	var d := img.get_data()
 	var w := img.get_width()
+	var h := img.get_height()
 	var cut8 := clampi(int(ceilf(cut * 255.0)), 1, 255)
-	var t0 := w / tiles
+	# A tile's size, width and height apart: a sheet need not be square (a leaf sheet twice as wide as tall).
+	var tw0 := w / tiles
+	var th0 := h / tiles
 	# The base level's share of texels at or over the cut, a tile each.
 	var base := PackedFloat32Array()
 	base.resize(tiles * tiles)
 	for ty in tiles:
 		for tx in tiles:
 			var n := 0
-			for y in t0:
-				var row := ((ty * t0 + y) * w + tx * t0) * 4 + 3
-				for x in t0:
+			for y in th0:
+				var row := ((ty * th0 + y) * w + tx * tw0) * 4 + 3
+				for x in tw0:
 					if d[row + x * 4] >= cut8:
 						n += 1
-			base[ty * tiles + tx] = float(n) / float(t0 * t0)
+			base[ty * tiles + tx] = float(n) / float(maxi(tw0 * th0, 1))
 	for m in range(1, img.get_mipmap_count() + 1):
-		var tm := t0 >> m
-		if tm < 1:
+		var mw := maxi(w >> m, 1)
+		var mh := maxi(h >> m, 1)
+		var tw := mw / tiles
+		var th := mh / tiles
+		if tw < 1 or th < 1:
 			break
-		var mw := w >> m
 		var off := img.get_mipmap_offset(m)
 		for ty in tiles:
 			for tx in tiles:
-				var target := int(roundf(base[ty * tiles + tx] * float(tm * tm)))
+				var target := int(roundf(base[ty * tiles + tx] * float(tw * th)))
 				if target <= 0:
 					continue
 				# The histogram, then the byte value t whose count of texels at or over it comes CLOSEST to `target`
@@ -55,9 +60,9 @@ static func preserve(img: Image, cut: float, tiles := 1, premultiplied := false)
 				# the target can overshoot it many times over). Ties keep the lower coverage.
 				var hist := PackedInt32Array()
 				hist.resize(256)
-				for y in tm:
-					var row := off + ((ty * tm + y) * mw + tx * tm) * 4 + 3
-					for x in tm:
+				for y in th:
+					var row := off + ((ty * th + y) * mw + tx * tw) * 4 + 3
+					for x in tw:
 						hist[d[row + x * 4]] += 1
 				var acc := 0
 				var t := 0
@@ -74,9 +79,9 @@ static func preserve(img: Image, cut: float, tiles := 1, premultiplied := false)
 				var s := float(cut8) / float(t)
 				if absf(s - 1.0) < 0.002:
 					continue
-				for y in tm:
-					var row := off + ((ty * tm + y) * mw + tx * tm) * 4
-					for x in tm:
+				for y in th:
+					var row := off + ((ty * th + y) * mw + tx * tw) * 4
+					for x in tw:
 						var i := row + x * 4
 						var a := d[i + 3]
 						if a == 0:
@@ -88,20 +93,21 @@ static func preserve(img: Image, cut: float, tiles := 1, premultiplied := false)
 							d[i + 1] = mini(int(roundf(d[i + 1] * k)), 255)
 							d[i + 2] = mini(int(roundf(d[i + 2] * k)), 255)
 						d[i + 3] = na
-	return Image.create_from_data(w, img.get_height(), true, Image.FORMAT_RGBA8, d)
+	return Image.create_from_data(w, h, true, Image.FORMAT_RGBA8, d)
 
 
 ## The share of texels at or over `cut` in tile (tx, ty) of a `tiles` grid at mip `m` of `img` (RGBA8, mipmapped).
 static func coverage(img: Image, m: int, cut: float, tiles := 1, tx := 0, ty := 0) -> float:
 	var d := img.get_data()
-	var tm := (img.get_width() / tiles) >> m
-	var mw := img.get_width() >> m
+	var mw := maxi(img.get_width() >> m, 1)
+	var tw := mw / tiles
+	var th := maxi(img.get_height() >> m, 1) / tiles
 	var off := img.get_mipmap_offset(m)
 	var cut8 := clampi(int(ceilf(cut * 255.0)), 1, 255)
 	var n := 0
-	for y in tm:
-		var row := off + ((ty * tm + y) * mw + tx * tm) * 4 + 3
-		for x in tm:
+	for y in th:
+		var row := off + ((ty * th + y) * mw + tx * tw) * 4 + 3
+		for x in tw:
 			if d[row + x * 4] >= cut8:
 				n += 1
-	return float(n) / float(maxi(tm * tm, 1))
+	return float(n) / float(maxi(tw * th, 1))

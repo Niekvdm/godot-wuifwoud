@@ -14,6 +14,9 @@
   against the mesh rendered 4x closer and scaled down (a 4x4-supersampled reference), 160-230 m: cards cover 0.94-1.11x
   the reference (the dead tree's card was 1.2-1.3x its mesh at 160 m, 2.4-2.7x at 300 m). The cards come out 3-5 %
   darker at distance than before (the texels the coverage keeps). A bake or leaf sheet made before reads "needs".
+- Fix: a leaf sheet that is not square (a pack's 4096x2048 sakura atlas) is filled and its mips kept like any other;
+  the coverage step walked width-by-width tiles and read past the end ("Out of bounds get index"), so the species
+  drew its source sheet.
 - An authored LOD level no simpler than LOD0 on a surface (more or as many indices) is left out of that surface, its
   vertices too: the engine took only shorter index LODs and dropped it with "index_count >= index_array_len" (32 such
   errors on a 183-species pack: bamboo, banana, sakura), its vertices left in the buffer unused.

@@ -82,5 +82,22 @@ static func run() -> Dictionary:
 		absf(MipRes.coverage(gout, 3, cut, 2, 0, 0) - MipRes.coverage(grid, 0, cut, 2, 0, 0)) < 0.06
 		and absf(MipRes.coverage(gout, 3, cut, 2, 1, 0) - MipRes.coverage(grid, 0, cut, 2, 1, 0)) < 0.06
 		and MipRes.coverage(gout, 3, cut, 2, 0, 1) == 0.0)
+	# Not square (a leaf sheet twice as wide as tall, as a pack's sakura has): every level measured on its own height.
+	var wide := Image.create_empty(256, 128, false, Image.FORMAT_RGBA8)
+	wide.fill(Color(0, 0, 0, 0))
+	wide.blit_rect(tiles[0], Rect2i(0, 0, 128, 128), Vector2i(0, 0))
+	wide.blit_rect(tiles[1], Rect2i(0, 0, 128, 128), Vector2i(128, 0))
+	wide.generate_mipmaps()
+	var wout := MipRes.preserve(wide, cut)
+	var tall := Image.create_empty(128, 256, false, Image.FORMAT_RGBA8)
+	tall.fill(Color(0, 0, 0, 0))
+	tall.blit_rect(tiles[0], Rect2i(0, 0, 128, 128), Vector2i(0, 0))
+	tall.generate_mipmaps()
+	var tout := MipRes.preserve(tall, cut)
+	_chk(r, "a sheet wider or taller than it is high or wide is preserved too (%.3f / %.3f at mip 2, base %.3f / %.3f)"
+		% [MipRes.coverage(wout, 2, cut) if wout else -1.0, MipRes.coverage(tout, 2, cut) if tout else -1.0,
+		MipRes.coverage(wide, 0, cut), MipRes.coverage(tall, 0, cut)],
+		wout != null and tout != null and absf(MipRes.coverage(wout, 2, cut) - MipRes.coverage(wide, 0, cut)) < 0.06
+		and absf(MipRes.coverage(tout, 2, cut) - MipRes.coverage(tall, 0, cut)) < 0.06)
 	_chk(r, "not RGBA8 with mips: null", MipRes.preserve(Image.create_empty(8, 8, false, Image.FORMAT_RGBA8), cut) == null)
 	return r
