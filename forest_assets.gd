@@ -1216,11 +1216,6 @@ static func _dress(sp, mesh: ArrayMesh, p: Dictionary, live: bool, leaf: Texture
 		# Bark bends with the tree but must not flutter: a trembling trunk is the
 		# other half of the "heat haze" look.
 		sm.set_shader_parameter("foliage_mask", 1.0 if foliage else 0.0)
-		# A filled leaf sheet's mips keep its coverage (ForestLeafSheet): no mip boost on top, and marked so the spawner's
-		# pushes (`leaf_mip_alpha`) leave it at 0.
-		if foliage and leaf != null:
-			sm.set_shader_parameter("leaf_mip_scale", 0.0)
-			sm.set_meta(&"wf_coverage_mips", true)
 		# Only a stamped surface may be card-culled: an unstamped COLOR reads (1,1,1,1)
 		# and every card would collapse the moment thinning came on.
 		sm.set_shader_parameter("cards_stamped", bool(p["stamped"]) and foliage)

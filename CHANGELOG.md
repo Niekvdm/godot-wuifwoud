@@ -2,15 +2,20 @@
 
 ## Unreleased
 
+- Fix: thin-leaved mesh crowns no longer vanish with distance. The filled leaf sheets had their coverage kept per mip
+  as well, and on the asian_flora pack's needle pines and bamboo the mesh crowns all but disappeared past ~100 m (the
+  mesh covered 0-39 % of a 4x4-supersampled reference at 160-230 m; a bamboo was gone by 230 m) while their cards stayed
+  full, so trees popped to full crowns at the hand-over. Leaf sheets are plain mips again with the mesh's runtime boost
+  (`leaf_mip_alpha`): 100-113 % of the reference on the same trees. Their files carry a new version in their name, so
+  every leaf sheet built before reads "needs" and is built again.
 - Impostor card cost: back to a 4-vertex quad (the band strip had doubled the card pass), no trim by default, the depth
   step skipped on cards under 48 px (`depth_min_px`; at that size its shift is a pixel or less), and a frame of no
   weight not read. A single-frame mode for small cards is there (`blend_min_px`) but off: it measured no gain. On a
   field of 120k cards (210 m-2 km, 1600x900): 0.52 ms of GPU, against 0.59-0.63 with the box trim and 0.35-0.38 for
   the card before the reprojection and depth work; the rest is the per-frame reprojection and gradient taps.
-- Coverage-preserving alpha mips (`ForestAlphaMips`; I. Castaño, "Computing Alpha Mipmaps"): each mip's share of
-  texels at or over the alpha cut is the base level's, per view on the impostor albedo sheet (at the card's cut) and on
-  the filled leaf sheets (at the species' cut, which names the sheet's file), and the shaders' fixed mip boost (Golus'
-  `alpha * (1 + lod * 0.25)`) is 0 for sheets made so (the spawner's `leaf_mip_alpha` push leaves them). Measured
+- Coverage-preserving alpha mips (`ForestAlphaMips`; I. Castaño, "Computing Alpha Mipmaps") on the impostor albedo
+  sheet: each mip's share of texels at or over the card's cut is the base level's, per view, and the card's fixed mip
+  boost (Golus' `alpha * (1 + lod * 0.25)`) is 0 for sheets made so. Measured
   against the mesh rendered 4x closer and scaled down (a 4x4-supersampled reference), 160-230 m: cards cover 0.94-1.11x
   the reference (the dead tree's card was 1.2-1.3x its mesh at 160 m, 2.4-2.7x at 300 m). The cards come out 3-5 %
   darker at distance than before (the texels the coverage keeps). A bake or leaf sheet made before reads "needs".

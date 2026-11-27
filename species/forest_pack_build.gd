@@ -160,7 +160,7 @@ static func state_of(s, dir: String, man: Dictionary) -> Dictionary:
 			return {"state": "needs", "why": "its impostor has no trim or depth sheet yet"}
 		var fol := SpeciesRes.resolve(String(s.foliage_albedo))
 		var lf := String(e.get("leaf", ""))
-		if fol != "" and (lf != LeafRes.file_for(fol, float(s.alpha_cut)) or not FileAccess.file_exists(dir.path_join(lf))):
+		if fol != "" and (lf != LeafRes.file_for(fol) or not FileAccess.file_exists(dir.path_join(lf))):
 			return {"state": "needs", "why": "its leaves have no filled sheet yet"}
 	var src: Dictionary = e.get("sources", {})
 	var files: PackedStringArray = s.files()
@@ -386,14 +386,13 @@ func _leaf_sheet(s, dir: String, r: Dictionary) -> Texture2D:
 	var src := SpeciesRes.resolve(String(s.foliage_albedo))
 	if src == "" or not ResourceLoader.exists(src):
 		return null
-	var cut := float(s.alpha_cut)
-	var f := LeafRes.file_for(src, cut)
+	var f := LeafRes.file_for(src)
 	if not _leaves.has(dir):
 		_leaves[dir] = {}
 	var made: Dictionary = _leaves[dir]
 	if not made.has(f):
 		var tex := load(src) as Texture2D
-		var img := LeafRes.store(LeafRes.fill(tex.get_image() if tex != null else null, cut))
+		var img := LeafRes.store(LeafRes.fill(tex.get_image() if tex != null else null))
 		var err := _save_sheet(img, _stage(dir).path_join(f)) if img != null else FAILED
 		made[f] = ImageTexture.create_from_image(img) if err == OK else null
 		if err != OK:

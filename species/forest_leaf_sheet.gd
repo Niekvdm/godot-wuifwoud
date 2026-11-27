@@ -19,20 +19,19 @@ extends RefCounted
 ## leaves at whatever scale they are. Only a fully clear texel changes: one with any coverage keeps its own colour (an
 ## anti-aliased leaf edge is drawn with it), and the alpha is the source's, so the leaves' shape is untouched.
 
-## The coverage-preserving alpha mips.
-const MipRes := preload("res://addons/wuifwoud/species/forest_alpha_mips.gd")
+## A sheet's file in a pack's built/: one per source texture (species often share a sheet), named after its path and
+## the sheet's version: "v2" are plain mips. The v1 sheets kept their coverage per mip (ForestAlphaMips) and made
+## thin-leaved crowns VANISH with distance (the asian_flora pack's needle pines and bamboo: the mesh covered 0-39 % of a
+## supersampled reference at 160-230 m, against 100-113 % with plain mips and the runtime boost), so a v1 name reads
+## as stale and the species is built again.
+static func file_for(source_path: String) -> String:
+	return "leaf_%s.res" % ("%s|v2" % source_path).md5_text().substr(0, 12)
 
 
-## A sheet's file in a pack's built/: one per source texture and alpha cut (species often share a sheet; its mips keep
-## coverage at the cut, so two cuts are two sheets), named after both.
-static func file_for(source_path: String, cut: float) -> String:
-	return "leaf_%s.res" % ("%s|%.3f" % [source_path, cut]).md5_text().substr(0, 12)
-
-
-## The filled sheet of `src` (any format; decompressed, its mips dropped), RGBA8 with fresh mips; null without one.
-## `cut` > 0: the mips keep the base level's coverage at that alpha cut (ForestAlphaMips), and the mesh's own mip boost
-## (tree_wind `leaf_mip_scale`) is then 0 for it.
-static func fill(src: Image, cut := -1.0) -> Image:
+## The filled sheet of `src` (any format; decompressed, its mips dropped), RGBA8 with fresh, PLAIN mips; null without
+## one. Coverage at distance is the mesh shader's mip boost (tree_wind `leaf_mip_scale`), as for any leaf sheet: per-mip
+## coverage keeping was tried here and dropped (file_for says why).
+static func fill(src: Image) -> Image:
 	if src == null or src.is_empty():
 		return null
 	var img := src.duplicate() as Image
@@ -83,8 +82,6 @@ static func fill(src: Image, cut := -1.0) -> Image:
 		out[i + 3] = orig[i + 3]
 	var res := Image.create_from_data(img.get_width(), img.get_height(), false, Image.FORMAT_RGBA8, out)
 	res.generate_mipmaps()
-	if cut > 0.0:
-		res = MipRes.preserve(res, cut)
 	return res
 
 
