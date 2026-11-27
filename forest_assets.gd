@@ -690,6 +690,12 @@ static func _build_authored_chain(chain: Array, foliage_surfaces: Array) -> Arra
 			var arr: Array = (chain[k] as ArrayMesh).surface_get_arrays(si)
 			var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
 			var idx: PackedInt32Array = (arr[Mesh.ARRAY_INDEX] as PackedInt32Array).duplicate()
+			# A LEVEL NO SIMPLER THAN LOD0 ON THIS SURFACE is left out of it, vertices and all: the engine takes an index
+			# LOD only shorter than the surface's own (RenderingServer: "index_count >= index_array_len", the level
+			# dropped and its vertices left in the buffer unused). Seen on packs whose LOD1 keeps a leaf surface whole
+			# (bamboo, banana, sakura): this surface stays at LOD0 there, as the engine would have drawn it anyway.
+			if k > 0 and idx.size() >= main_idx.size():
+				continue
 			if offset > 0:
 				for i in idx.size():
 					idx[i] += offset
@@ -1210,6 +1216,11 @@ static func _dress(sp, mesh: ArrayMesh, p: Dictionary, live: bool, leaf: Texture
 		# Bark bends with the tree but must not flutter: a trembling trunk is the
 		# other half of the "heat haze" look.
 		sm.set_shader_parameter("foliage_mask", 1.0 if foliage else 0.0)
+		# A filled leaf sheet's mips keep its coverage (ForestLeafSheet): no mip boost on top, and marked so the spawner's
+		# pushes (`leaf_mip_alpha`) leave it at 0.
+		if foliage and leaf != null:
+			sm.set_shader_parameter("leaf_mip_scale", 0.0)
+			sm.set_meta(&"wf_coverage_mips", true)
 		# Only a stamped surface may be card-culled: an unstamped COLOR reads (1,1,1,1)
 		# and every card would collapse the moment thinning came on.
 		sm.set_shader_parameter("cards_stamped", bool(p["stamped"]) and foliage)
@@ -1389,7 +1400,7 @@ static func _crown_uv_of(mesh: ArrayMesh, foliage: PackedInt32Array) -> Vector4:
 
 
 ## An impostor card for species `id` (`sp` its ForestSpecies or null, `p` its preparation, `ring` its baked view ring or
-## {}, `profile` its silhouette family): {"mesh": QuadMesh, or the band strip of a trimmed ring, "mat": ShaderMaterial,
+## {}, `profile` its silhouette family): {"mesh": QuadMesh, "mat": ShaderMaterial,
 ## "size": the card's square}. Neither cached nor registered for
 ## the wind and the hand-over pushes: _billboard does both for the forest's own cards; the Species dialog's view draws
 ## one of its own.
@@ -1443,15 +1454,16 @@ static func card_of(id: String, sp, p: Dictionary, ring: Dictionary, profile: in
 		sm.set_shader_parameter("crown_extent", Vector2(
 			span / rw if rw > 0.001 else 1.0,
 			span / rh if rh > 0.001 else 1.0))
-		# THE TRIMMED CARD, when the bake measured one: the band strip, pulled in per view by the shader. Without a
-		# trim the strip would be the same square at eight times the triangles, so the quad stays.
 		# THE DEPTH SHEET: each blended frame shifted by the depth it baked (tree_billboard.gdshader `frame_uv`).
+		if bool(ring.get("coverage_mips", false)):
+			sm.set_shader_parameter("alpha_mip_scale", 0.0)
 		if ring.get("depth") is Texture2D:
 			sm.set_shader_parameter("impostor_depth", ring["depth"])
 			sm.set_shader_parameter("depth_range", float(ring["depth_range"]))
 		var bands := int(ring.get("trim_bands", 0))
+		# THE TRIMMED CARD, when the bake measured one: the quad's corners pulled in per view to the box its frames
+		# reach (tree_billboard.gdshader `trim_sil` says why a quad and not a band strip).
 		if ring.get("trim") is Texture2D and bands > 0:
-			mesh = _card_strip(span, bands)
 			sm.set_shader_parameter("impostor_trim", ring["trim"])
 			sm.set_shader_parameter("trim_bands", bands)
 			sm.set_shader_parameter("trim_sets", int(ring["trim_sets"]))
@@ -1474,34 +1486,6 @@ static func card_of(id: String, sp, p: Dictionary, ring: Dictionary, profile: in
 	sm.set_shader_parameter("backlight_col", Color(0.10, 0.14, 0.05))
 	sm.set_shader_parameter("profile", profile)
 	return {"mesh": mesh, "mat": sm, "size": q.size}
-
-
-## The trimmed card's mesh: `bands` horizontal bands over a `span` square, two vertices a row (bottom row first), laid
-## out exactly as a QuadMesh of that size (centred, UV v top→bottom), so untrimmed it IS the square. The shader moves
-## the vertices; row k's is UV.y = 1 - k / bands, its side UV.x.
-static func _card_strip(span: float, bands: int) -> ArrayMesh:
-	var verts := PackedVector3Array()
-	var uvs := PackedVector2Array()
-	var normals := PackedVector3Array()
-	var idx := PackedInt32Array()
-	for k in bands + 1:
-		var v := float(k) / bands
-		for side in 2:
-			verts.append(Vector3((float(side) - 0.5) * span, (v - 0.5) * span, 0.0))
-			uvs.append(Vector2(float(side), 1.0 - v))
-			normals.append(Vector3(0, 0, 1))
-	for k in bands:
-		var a := k * 2
-		idx.append_array([a, a + 2, a + 1, a + 1, a + 2, a + 3])
-	var arr := []
-	arr.resize(Mesh.ARRAY_MAX)
-	arr[Mesh.ARRAY_VERTEX] = verts
-	arr[Mesh.ARRAY_NORMAL] = normals
-	arr[Mesh.ARRAY_TEX_UV] = uvs
-	arr[Mesh.ARRAY_INDEX] = idx
-	var m := ArrayMesh.new()
-	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
-	return m
 
 
 ## Impostor card + material for a species: a QuadMesh sized to the tree's real
@@ -1651,6 +1635,8 @@ static func ring_at(dir: String, id: String, man: Dictionary) -> Dictionary:
 			out["depth_range"] = float(bake["depth_range"])
 	# THE CARD'S TRIM (ForestImpostorBaker.trim_of), when this bake measured one: a bake that predates it says no
 	# `trim_bands`, and a sheet it did not write is not read against its layout.
+	# Its albedo mips keep each view's coverage (ForestAlphaMips): the card's own mip boost is then off.
+	out["coverage_mips"] = String(bake.get("alpha_mips", "")) == "coverage"
 	var tr := dir.path_join(id + "_trim.res")
 	if int(bake.get("trim_bands", 0)) > 0 and int(bake.get("trim_sets", 0)) > 0 and ResourceLoader.exists(tr):
 		var tex := _sheet(tr)

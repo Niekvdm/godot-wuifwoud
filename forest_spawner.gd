@@ -2770,7 +2770,8 @@ func push_lod_params() -> void:
 		# thinned there.
 		if not is_instance_valid(sm) or ForestAssets.is_card_material(sm):
 			continue
-		sm.set_shader_parameter("leaf_mip_scale", leaf_mip_alpha)
+		# A leaf sheet whose mips keep its coverage takes no boost (ForestAssets._dress marks it).
+		sm.set_shader_parameter("leaf_mip_scale", 0.0 if sm.has_meta(&"wf_coverage_mips") else leaf_mip_alpha)
 		sm.set_shader_parameter("thin_coverage", thin_coverage)
 		sm.set_shader_parameter("thin_start_m", foliage_thin_start_m)
 		sm.set_shader_parameter("thin_end_m", tree_visibility_m)

@@ -62,6 +62,11 @@ const TRIM_MIP_SPAN := 3
 ## and lets the edge decide its samples; and `alpha_mip_scale` (the card sets neither). A texel can be drawn only at
 ## alpha >= TRIM_CUT / boost; the trim keeps every texel that can, and changes there belong here too.
 const TRIM_CUT := 0.175
+## The card's alpha cut (tree_billboard.gdshader `alpha_cut`): its albedo sheet's mips keep each view's coverage at it
+## (ForestAlphaMips), and the card's own mip boost (`alpha_mip_scale`) is 0 for a sheet made so.
+const CARD_CUT := 0.35
+## The coverage-preserving alpha mips.
+const MipRes := preload("res://addons/wuifwoud/species/forest_alpha_mips.gd")
 const TRIM_MIP_SCALE := 0.25
 ## Headroom under that threshold (BC7's alpha error, a hardware LOD a little past the estimate).
 const TRIM_SAFETY := 0.8
@@ -91,7 +96,7 @@ var _busy := false
 static func settings() -> Dictionary:
 	return {"grid": GRID, "cols": GRID, "rows": GRID, "views": GRID * GRID, "tile": OUT_TILE, "render_tile": TILE,
 		"projection": "hemi_oct", "gbuffer": true, "trim_bands": TRIM_BANDS, "trim_sets": TRIM_SETS,
-		"depth_range": DEPTH_RANGE}
+		"depth_range": DEPTH_RANGE, "alpha_mips": "coverage"}
 
 
 ## The row of viewports under `host` (the editor's base control, the command line's root, a render suite's host).
@@ -325,7 +330,9 @@ func _blit(view: int, img: Image, dst: Image) -> void:
 ## `rg`: THE DEPTH SHEET, two channels: the render writes (depth, 1), so premultiplied it is (depth × coverage, coverage)
 ## and the card divides the one by the other, as it divides the other sheets by their alpha. BC5 (RGTC_RG): two
 ## independent 8-bit-interpolated channels, the same byte a texel as BC7.
-static func store_image(src: Image, rg := false) -> Image:
+##
+## `coverage_cut` > 0: each view's mips keep its base coverage at that cut (ForestAlphaMips, per tile, premultiplied).
+static func store_image(src: Image, rg := false, coverage_cut := -1.0) -> Image:
 	var img := src.duplicate() as Image
 	img.premultiply_alpha()
 	var w := img.get_width()
@@ -337,6 +344,8 @@ static func store_image(src: Image, rg := false) -> Image:
 	if rg:
 		img.convert(Image.FORMAT_RG8)
 	img.generate_mipmaps()
+	if coverage_cut > 0.0 and not rg:
+		img = MipRes.preserve(img, coverage_cut, GRID, true)
 	# Two channels go to BC5 through the S3TC family; the NORMAL source pins them as RG (a generic one may read two
 	# equal channels as one and pick BC4).
 	if rg:

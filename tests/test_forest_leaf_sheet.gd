@@ -79,6 +79,13 @@ static func run() -> Dictionary:
 	_chk(r, "mip %d: the source's colour sinks (green %.3f), the filled sheet's holds the leaves' (%.3f)" % [m, was.g, now.g],
 		was.g < 0.33 and absf(now.g - leaf.g) < 0.03)
 
+	# With a cut, the mips keep the base coverage at it (ForestAlphaMips): the mesh's mip boost is off for the sheet.
+	const MipRes := preload("res://addons/wuifwoud/species/forest_alpha_mips.gd")
+	var kept := LeafRes.fill(src, 0.5)
+	var c0 := MipRes.coverage(kept, 0, 0.5)
+	_chk(r, "with a cut its mips keep the base coverage (%.3f; mip 3 %.3f, plain %.3f)" % [c0, MipRes.coverage(kept, 3, 0.5),
+		MipRes.coverage(out, 3, 0.5)], absf(MipRes.coverage(kept, 3, 0.5) - c0) <= absf(MipRes.coverage(out, 3, 0.5) - c0)
+		and absf(MipRes.coverage(kept, 3, 0.5) - c0) < 0.05)
 	_chk(r, "no sheet, nothing", LeafRes.fill(null) == null)
 	var blank := Image.create_empty(16, 16, false, Image.FORMAT_RGBA8)
 	_chk(r, "a sheet with no coverage at all comes back as it was (mipmapped)",
@@ -87,10 +94,11 @@ static func run() -> Dictionary:
 	var stored := LeafRes.store(out)
 	_chk(r, "store keeps the mips and compresses (BC7)", stored != null and stored.has_mipmaps()
 		and stored.get_format() == Image.FORMAT_BPTC_RGBA)
-	_chk(r, "a sheet's file is named after its source path, stable",
-		LeafRes.file_for("user://a/Leaves.png") == LeafRes.file_for("user://a/Leaves.png")
-		and LeafRes.file_for("user://a/Leaves.png") != LeafRes.file_for("user://b/Leaves.png")
-		and LeafRes.file_for("user://a/Leaves.png").begins_with("leaf_") and LeafRes.file_for("user://a/Leaves.png").ends_with(".res"))
+	_chk(r, "a sheet's file is named after its source path and cut, stable",
+		LeafRes.file_for("user://a/Leaves.png", 0.5) == LeafRes.file_for("user://a/Leaves.png", 0.5)
+		and LeafRes.file_for("user://a/Leaves.png", 0.5) != LeafRes.file_for("user://b/Leaves.png", 0.5)
+		and LeafRes.file_for("user://a/Leaves.png", 0.5) != LeafRes.file_for("user://a/Leaves.png", 0.4)
+		and LeafRes.file_for("user://a/Leaves.png", 0.5).begins_with("leaf_") and LeafRes.file_for("user://a/Leaves.png", 0.5).ends_with(".res"))
 
 	# ── the pack build: made once a build per source sheet, staged, landed by the first species, shared, pruned ──
 	TreeFix.rm_tree(ROOT)
@@ -108,7 +116,7 @@ static func run() -> Dictionary:
 	var rb := {"id": "W_B", "dir": built, "warnings": PackedStringArray(), "inputs": {}, "pack": "", "sources": {}}
 	var ta := j._leaf_sheet(a, built, ra)
 	var tb := j._leaf_sheet(b, built, rb)
-	var f := LeafRes.file_for(tex_path)
+	var f := LeafRes.file_for(tex_path, float(a.alpha_cut))
 	var staged := ProjectSettings.globalize_path(built.path_join(BuildRes.STAGING).path_join(f))
 	_chk(r, "a species' leaf sheet is filled and staged under its source's name, the texture the bake dresses with",
 		ta is Texture2D and String(ra.get("leaf", "")) == f and FileAccess.file_exists(staged))
@@ -123,7 +131,7 @@ static func run() -> Dictionary:
 	_chk(r, "the first to land moves it in, both entries name it, and the forest loads it",
 		FileAccess.file_exists(dst) and String(man["species"]["W_A"].get("leaf", "")) == f
 		and String(man["species"]["W_B"].get("leaf", "")) == f and VA.leaf_at(built, "W_B", man, true) is Texture2D)
-	var stray := ProjectSettings.globalize_path(built.path_join(LeafRes.file_for("user://gone.png")))
+	var stray := ProjectSettings.globalize_path(built.path_join(LeafRes.file_for("user://gone.png", 0.5)))
 	ResourceSaver.save(Image.create_empty(4, 4, false, Image.FORMAT_RGBA8), stray)
 	BuildRes.prune_leaves(built, man)
 	_chk(r, "a sheet no species names is pruned; a named one stays", not FileAccess.file_exists(stray) and FileAccess.file_exists(dst))

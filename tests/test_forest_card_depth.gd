@@ -103,6 +103,8 @@ static func run() -> Dictionary:
 	_chk(r, "card_of hands the shader the depth sheet and its range",
 		mat.get_shader_parameter("impostor_depth") == ring["depth"]
 		and is_equal_approx(float(mat.get_shader_parameter("depth_range")), BakerRes.DEPTH_RANGE))
+	_chk(r, "a bake whose mips keep coverage turns the card's mip boost off",
+		bool(ring.get("coverage_mips", false)) and float(mat.get_shader_parameter("alpha_mip_scale")) == 0.0)
 	var shallow := ring.duplicate()
 	shallow.erase("depth")
 	var plain := VA.card_of("W_T", null, p, shallow, 0).get("mat") as ShaderMaterial

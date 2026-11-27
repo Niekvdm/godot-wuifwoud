@@ -102,7 +102,7 @@ static func run() -> Dictionary:
 	st = BuildRes.state_of(pack.species[0], dir, baked)
 	_chk(r, "a foliage sheet without its filled leaf sheet needs building (%s)" % str(st),
 		String(st["state"]) == "needs" and String(st["why"]) == "its leaves have no filled sheet yet")
-	var lf := LeafRes.file_for(leaf_src)
+	var lf := LeafRes.file_for(leaf_src, float(pack.species[0].alpha_cut))
 	ResourceSaver.save(pic, dir.path_join(lf))
 	baked["species"]["W_A"]["leaf"] = lf
 	st = BuildRes.state_of(pack.species[0], dir, baked)

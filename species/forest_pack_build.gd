@@ -154,12 +154,13 @@ static func state_of(s, dir: String, man: Dictionary) -> Dictionary:
 		var bk: Dictionary = man["bake"]
 		var id := String(s.id)
 		if int(bk.get("trim_bands", 0)) <= 0 or float(bk.get("depth_range", 0.0)) <= 0.0 \
+				or String(bk.get("alpha_mips", "")) != "coverage" \
 				or not FileAccess.file_exists(dir.path_join(id + "_trim.res")) \
 				or not FileAccess.file_exists(dir.path_join(id + "_depth.res")):
 			return {"state": "needs", "why": "its impostor has no trim or depth sheet yet"}
 		var fol := SpeciesRes.resolve(String(s.foliage_albedo))
 		var lf := String(e.get("leaf", ""))
-		if fol != "" and (lf != LeafRes.file_for(fol) or not FileAccess.file_exists(dir.path_join(lf))):
+		if fol != "" and (lf != LeafRes.file_for(fol, float(s.alpha_cut)) or not FileAccess.file_exists(dir.path_join(lf))):
 			return {"state": "needs", "why": "its leaves have no filled sheet yet"}
 	var src: Dictionary = e.get("sources", {})
 	var files: PackedStringArray = s.files()
@@ -385,13 +386,14 @@ func _leaf_sheet(s, dir: String, r: Dictionary) -> Texture2D:
 	var src := SpeciesRes.resolve(String(s.foliage_albedo))
 	if src == "" or not ResourceLoader.exists(src):
 		return null
-	var f := LeafRes.file_for(src)
+	var cut := float(s.alpha_cut)
+	var f := LeafRes.file_for(src, cut)
 	if not _leaves.has(dir):
 		_leaves[dir] = {}
 	var made: Dictionary = _leaves[dir]
 	if not made.has(f):
 		var tex := load(src) as Texture2D
-		var img := LeafRes.store(LeafRes.fill(tex.get_image() if tex != null else null))
+		var img := LeafRes.store(LeafRes.fill(tex.get_image() if tex != null else null, cut))
 		var err := _save_sheet(img, _stage(dir).path_join(f)) if img != null else FAILED
 		made[f] = ImageTexture.create_from_image(img) if err == OK else null
 		if err != OK:
@@ -415,7 +417,7 @@ func _store(res: Dictionary, out: Dictionary) -> void:
 	if int(res.get("opaque", 0)) == 0:
 		out["warning"] = "its impostor rendered nothing: it has no card"
 	else:
-		var alb = BakerRes.store_image(res["albedo"])
+		var alb = BakerRes.store_image(res["albedo"], false, BakerRes.CARD_CUT)
 		var nrm = BakerRes.store_image(res["normal"])
 		if alb == null or nrm == null:
 			out["warning"] = "its impostor sheets could not be compressed (BC7)"

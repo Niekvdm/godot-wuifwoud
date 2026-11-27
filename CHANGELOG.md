@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- Impostor card cost: back to a 4-vertex quad (the band strip had doubled the card pass), no trim by default, the depth
+  step skipped on cards under 48 px (`depth_min_px`; at that size its shift is a pixel or less), and a frame of no
+  weight not read. A single-frame mode for small cards is there (`blend_min_px`) but off: it measured no gain. On a
+  field of 120k cards (210 m-2 km, 1600x900): 0.52 ms of GPU, against 0.59-0.63 with the box trim and 0.35-0.38 for
+  the card before the reprojection and depth work; the rest is the per-frame reprojection and gradient taps.
+- Coverage-preserving alpha mips (`ForestAlphaMips`; I. Castaño, "Computing Alpha Mipmaps"): each mip's share of
+  texels at or over the alpha cut is the base level's, per view on the impostor albedo sheet (at the card's cut) and on
+  the filled leaf sheets (at the species' cut, which names the sheet's file), and the shaders' fixed mip boost (Golus'
+  `alpha * (1 + lod * 0.25)`) is 0 for sheets made so (the spawner's `leaf_mip_alpha` push leaves them). Measured
+  against the mesh rendered 4x closer and scaled down (a 4x4-supersampled reference), 160-230 m: cards cover 0.94-1.11x
+  the reference (the dead tree's card was 1.2-1.3x its mesh at 160 m, 2.4-2.7x at 300 m). The cards come out 3-5 %
+  darker at distance than before (the texels the coverage keeps). A bake or leaf sheet made before reads "needs".
+- An authored LOD level no simpler than LOD0 on a surface (more or as many indices) is left out of that surface, its
+  vertices too: the engine took only shorter index LODs and dropped it with "index_count >= index_array_len" (32 such
+  errors on a 183-species pack: bamboo, banana, sakura), its vertices left in the buffer unused.
+- Known: a card is 4-10 % darker than its mesh up close on some species (CommonTree_4: 12-18 % at 160 m against the
+  4x reference); filtered baked normals tilting toward the camera explain 3-4 points of that at 160 m (a normal sheet
+  that kept z would fix it), the rest is unexplained. Writing the card's depth (pixel depth offset) was looked at and
+  not built: camera-facing cards do not cut each other, and on a 30 deg slope no clipped crowns or seams showed.
+
 - Mesh trees keep their colour with distance, so a tree no longer brightens when it hands over to its card. A leaf
   texture's clear texels hold whatever colour was left there (the starter's broadleaf sheet: half the leaves'
   brightness over three quarters of it) and mips average colour without weighting it by alpha, so a crown sank toward
@@ -61,12 +81,12 @@
   `REPLACE`: a region the cache holds is not read again, and is never overwritten from its file. A pump let go with
   loads in flight still takes them. The main thread pays ~5 µs a load in flight a frame and ~20 µs to land one
   (measured: 64 regions, 100 µs a frame on average while they load).
-- Trimmed impostor cards: a built card is a strip of eight bands, each pulled in by the vertex shader to what the three
-  views it blends reach there, instead of the bake's whole square rasterised and mostly discarded. The pack build
-  measures the reach per view and per mip set on the stored albedo (`built/<id>_trim.res`,
-  `ForestImpostorBaker.trim_of`), conservatively: every texel the card's cut can keep stays inside. On the starter
-  pack's trees the strip covers 28-62 % of the square where the card is largest, 58-80 % farther out, against the
-  11-25 % the trees cover; a card under ~11 px draws its plain square.
+- The impostor bake measures each view's silhouette and depth reach (`built/<id>_trim.res`,
+  `ForestImpostorBaker.trim_of`, conservative on the stored sheet at every mip). The card can pull its quad's corners in
+  to that box (`trim_card`), off by default: an eight-band strip trimmed per band was tried first and measured at twice
+  the quad's GPU time on a field of 30k cards, and even the box costs more in the vertex stage than it saves at the
+  sizes cards are drawn (120k cards: 0.59-0.63 ms trimmed, 0.56-0.59 untrimmed). The sheet's depth reach clamps the
+  card's depth step.
 - Impostor cards sample each blended view where it saw the pixel: the view ray is met with each frame's own plane and
   stepped by a baked depth sheet (the bake's third channel, `built/<id>_depth.res`, BC5, read a few mips blurred so
   thin branches step together). From above and at steep angles the card no longer turns with the camera or sits off
