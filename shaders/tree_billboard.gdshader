@@ -94,13 +94,13 @@ uniform float alpha_cut : hint_range(0.0, 1.0) = 0.35;
 uniform float card_pivot_h = 0.0;
 // THE TRIMMED CARD (ForestImpostorBaker.trim_of). A view's silhouette fills a fraction
 // of the bake's square, and every texel outside it was rasterised, shaded up to the
-// first cut below and discarded. With a trim the mesh is a strip of `trim_bands`
-// horizontal bands (ForestAssets._card_strip) and vertex() pulls each row in to what the
-// three blended frames reach there: the conservative union, so no texel the cut keeps
-// is ever outside it. `impostor_trim` is RG8, a row a view and a mip set, column 0 the
-// view's vertical reach and column 1 + k band k's horizontal one, in `sil` units; the
-// set is picked by the card's size on screen (`trim_tile` texels a tile). `card_span`
-// is the card's square in mesh units, the strip's own size. 0 bands: the plain quad.
+// first cut below and discarded. With a trim vertex() pulls the quad's corners in to the
+// box the three blended frames reach (trim_sil): the conservative union, so no texel the
+// cut keeps is ever outside it. `impostor_trim` is RGBA8, a row a view and a mip set,
+// column 0 the view's vertical reach and column 1 + k band k's horizontal one (the box
+// takes their union), in `sil` units; the set is picked by the card's size on screen
+// (`trim_tile` texels a tile). `card_span` is the card's square in mesh units, the quad's
+// own size. 0 bands: no trim.
 // `alpha_cut` and `alpha_mip_scale` above are what the trim was measured against
 // (ForestImpostorBaker TRIM_CUT, half the cut for the WF_A2C variant's, and
 // TRIM_MIP_SCALE): lowering either draws texels it trimmed away.
@@ -111,6 +111,12 @@ uniform sampler2D impostor_trim : filter_nearest, repeat_disable;
 // and the frames are reprojected on their planes alone (see frame_setup).
 uniform sampler2D impostor_depth : filter_linear_mipmap, repeat_disable;
 uniform float depth_range = 0.0;
+// THE CARD'S DETAIL BY ITS SIZE ON SCREEN (the bake's tile, in pixels). Below `depth_min_px`
+// the depth step is skipped (three reads a pixel; at that size its shift is a pixel or
+// less), and below `blend_min_px` the card samples its nearest frame alone instead of
+// blending three (two thirds of its reads; 0 keeps the blend at every size).
+uniform float depth_min_px = 48.0;
+uniform float blend_min_px = 0.0;
 // THE DEPTH IS READ BLURRED, this many mip levels coarser than the albedo (and never
 // finer than the level after it). One parallax step reads the depth where the ray meets
 // the frame's plane, and beside a thin branch that is background: depth 0, the step
@@ -123,6 +129,11 @@ uniform int trim_bands = 0;
 uniform int trim_sets = 0;
 uniform float trim_tile = 128.0;
 uniform float card_span = 0.0;
+// WHETHER THE CARD IS TRIMMED (trim_sil): off. Measured on a field of 120k cards (210 m-2 km,
+// 1600x900, three runs a variant): trimmed 0.59-0.63 ms of GPU, untrimmed 0.56-0.59. At the
+// sizes cards are drawn the vertex stage's lookups cost more than the pixels they save. The
+// trim sheet stays bound either way: it holds each view's depth reach (frame_uv's clamp).
+uniform bool trim_card = false;
 
 group_uniforms shading;
 // THE CARD IS SHADED AS A CROWN, NOT AS A PLATE, and this block is the whole of it.
@@ -307,51 +318,47 @@ vec2 frame_margin(mat2 a, vec2 k, float zr) {
 	return vec2((abs(d[0].x) + abs(d[1].x)) * 0.5 + sk.x, (abs(d[0].y) + abs(d[1].y)) * 0.5 + sk.y);
 }
 
-// Where this strip vertex sits on the card, in `sil` units: row `k` of `trim_bands`,
-// side 0 left / 1 right, pulled in to what the blended frames `views` (weights `w`)
-// reach. `tile_px` is the bake's tile on screen in pixels, `m` the frames' margin
-// (frame_margin): their texels can land that far from where their tiles hold them.
+// Where this corner of the card sits, in `sil` units: side 0 left / 1 right, top 0 foot /
+// 1 crown, pulled in to the box the blended frames `views` (weights `w`) reach: their
+// vertical reach (the sheet's column 0) and the union of every band's horizontal reach,
+// each widened by the frames' margin `m` (frame_margin: their texels can land that far
+// from where their tiles hold them). `tile_px` is the bake's tile on screen in pixels.
+//
+// A QUAD, NOT A STRIP. The card was an eight-band strip, each row pulled to its own
+// bands' reach: on the starter's trees it covered 28-54 % of the square. It was measured
+// against the quad on a field of 30k cards (210 m-2 km, 1600x900): 0.45 ms of GPU for the
+// strip, 0.21 for the quad, and 0.44 with the strip folded flat (no lookups), so the cost
+// was the strip's 18 vertices running this vertex stage, at sizes where few pixels were
+// saved. The box keeps the quad's 4 vertices and still drops a narrow tree's empty sides.
 //
 // WHICH MIP SET. The hardware samples level log2(trim_tile / tile_px) (the card faces
 // the camera, so the footprint is isotropic) and its trilinear neighbour; set s holds
 // mips 0 .. s + 2, so taking s half a level BELOW the estimate leaves the hardware half a
 // level of headroom above it, and every finer level (a negative mip bias under TAA or
-// FSR) is in the set already. A card too small for the last set folds to the plain
-// square: one band holds it and the others collapse onto its foot, where their
-// triangles have no area.
-//
-// WHICH ROW. A row's y is its band edge clamped to the frames' vertical reach (rows past
-// it fold onto it), its width the union of the bands it joins: each band's trapezoid
-// then contains its own reach at both edges, so it contains the silhouette. With a
-// margin, the bands that can land on the row's two bands (those within m.y of them)
-// count, and every reach widens by the margin. Past TRIM_MARGIN (a frame a cell away
-// with deep parallax, the rolled overhead frames) the trim would save little: the card
-// folds to its square.
+// FSR) is in the set already. A card too small for the last set, or whose frames could
+// shift their texels past TRIM_MARGIN (a frame a cell away with deep parallax, the rolled
+// overhead frames), draws its whole square.
 const float TRIM_MARGIN = 0.125;
-vec2 trim_sil(int k, float side, float tile_px, ivec3 views, vec3 w, vec2 m) {
+vec2 trim_sil(float side, float top, float tile_px, ivec3 views, vec3 w, vec2 m) {
 	float lod = log2(max(trim_tile / max(tile_px, 1e-3), 1.0));
 	int tset = int(floor(max(lod - 0.5, 0.0)));
 	if (tset >= trim_sets || max(m.x, m.y) > TRIM_MARGIN) {
-		return vec2(side, k == trim_bands ? 1.0 : 0.0);
+		return vec2(side, top);
 	}
 	int r0 = tset * impostor_grid * impostor_grid;
 	vec2 yr = trim_reach(0, r0, views, w);
-	// Nothing there: every row on one point.
+	// Nothing there: the card on one point.
 	if (yr.x > yr.y) {
 		return vec2(0.5);
 	}
-	yr = vec2(max(yr.x - m.y, 0.0), min(yr.y + m.y, 1.0));
-	float kb = float(trim_bands);
-	int j0 = max(int(floor((float(max(k - 1, 0)) / kb - m.y) * kb)), 0);
-	int j1 = min(int(ceil((float(min(k + 1, trim_bands)) / kb + m.y) * kb)) - 1, trim_bands - 1);
 	vec2 xr = vec2(1.0, 0.0);
-	for (int j = j0; j <= j1; j++) {
-		vec2 e = trim_reach(j + 1, r0, views, w);
+	for (int j = 1; j <= trim_bands; j++) {
+		vec2 e = trim_reach(j, r0, views, w);
 		xr = vec2(min(xr.x, e.x), max(xr.y, e.y));
 	}
-	// An empty band: a row of no width at the middle.
+	yr = vec2(max(yr.x - m.y, 0.0), min(yr.y + m.y, 1.0));
 	xr = xr.x > xr.y ? vec2(0.5) : vec2(max(xr.x - m.x, 0.0), min(xr.y + m.x, 1.0));
-	return vec2(side < 0.5 ? xr.x : xr.y, clamp(float(k) / kb, yr.x, yr.y));
+	return vec2(side < 0.5 ? xr.x : xr.y, top < 0.5 ? yr.x : yr.y);
 }
 
 void vertex() {
@@ -453,6 +460,17 @@ void vertex() {
 		tile_c = clamp(tile_c, vec2(0.0), vec2(lim));
 		has_ring = 1.0;
 		int gi = impostor_grid;
+		// The bake's tile on screen (pixels): the card's square without a trim's own size
+		// (the tree's height, the square's near enough), on this pass's projection.
+		float tile_dv = PROJECTION_MATRIX[3][3] > 0.5 ? 1.0 : max(-(VIEW_MATRIX * vec4(inst, 1.0)).z, 0.1);
+		float tile_px_r = (card_span > 0.0 ? card_span : card_pivot_h * 2.0) * sy
+			* abs(PROJECTION_MATRIX[1][1]) * 0.5 * VIEWPORT_SIZE.y / tile_dv;
+		if (tile_px_r < blend_min_px) {
+			// One frame, the heaviest: the others get no weight and fragment() skips them.
+			vec2 best = tile_w.x >= tile_w.y && tile_w.x >= tile_w.z ? tile_a : (tile_w.y >= tile_w.z ? tile_b : tile_c);
+			tile_a = best;
+			tile_w = vec3(1.0, 0.0, 0.0);
+		}
 		views = ivec3(int(tile_a.y) * gi + int(tile_a.x), int(tile_b.y) * gi + int(tile_b.x),
 			int(tile_c.y) * gi + int(tile_c.x));
 		mat3 tb = mat3(lx, ly, lz);
@@ -468,15 +486,21 @@ void vertex() {
 					texelFetch(impostor_trim, ivec2(0, views.y), 0).b,
 					texelFetch(impostor_trim, ivec2(0, views.z), 0).b);
 			}
+			if (tile_px_r < depth_min_px) {
+				fzr = vec3(0.0);     // too small for the step to show: frame_uv skips it
+			}
 		}
-		if (tile_w.x > 0.0) {
-			trim_m = max(trim_m, frame_margin(fa_m, fk_a, fzr.x));
-		}
-		if (tile_w.y > 0.0) {
-			trim_m = max(trim_m, frame_margin(fb_m, fk_b, fzr.y));
-		}
-		if (tile_w.z > 0.0) {
-			trim_m = max(trim_m, frame_margin(fc_m, fk_c, fzr.z));
+		// The frames' margin, for the trim alone.
+		if (trim_card) {
+			if (tile_w.x > 0.0) {
+				trim_m = max(trim_m, frame_margin(fa_m, fk_a, fzr.x));
+			}
+			if (tile_w.y > 0.0) {
+				trim_m = max(trim_m, frame_margin(fb_m, fk_b, fzr.y));
+			}
+			if (tile_w.z > 0.0) {
+				trim_m = max(trim_m, frame_margin(fc_m, fk_c, fzr.z));
+			}
 		}
 	}
 
@@ -519,17 +543,16 @@ void vertex() {
 		VERTEX = vec3(0.0, 0.0, 1.0);
 		NORMAL = vec3(0.0, 0.0, 1.0);
 	} else {
-		// THE CARD'S OWN SHAPE: the quad's corners, or the trimmed strip's rows placed on
-		// this view (trim_sil), with `sil` following them so the atlas stays put under the
-		// moved vertices and the sway below bends along the rows.
+		// THE CARD'S OWN SHAPE: the quad's corners, pulled in to this view's box when the
+		// bake measured one (trim_sil), with `sil` following them so the atlas stays put
+		// under the moved vertices.
 		vec2 local = VERTEX.xy;
-		if (trim_bands > 0 && has_ring > 0.5 && card_span > 0.0) {
+		if (trim_card && trim_bands > 0 && has_ring > 0.5 && card_span > 0.0) {
 			// The tile's height on screen; an orthographic pass (the editor's) has no depth
 			// to divide by.
 			float depth = PROJECTION_MATRIX[3][3] > 0.5 ? 1.0 : max(-(VIEW_MATRIX * vec4(inst, 1.0)).z, 0.1);
 			float tile_px = card_span * sy * abs(PROJECTION_MATRIX[1][1]) * 0.5 * VIEWPORT_SIZE.y / depth;
-			int k = int(round((1.0 - UV.y) * float(trim_bands)));
-			sil = trim_sil(k, UV.x, tile_px, views, tile_w, trim_m);
+			sil = trim_sil(UV.x, 1.0 - UV.y, tile_px, views, tile_w, trim_m);
 			local = (sil - vec2(0.5)) * card_span;
 		}
 		float cv = sil.y;
@@ -584,7 +607,7 @@ vec3 frame_normal(vec2 tile, vec4 px) {
 vec3 frame_uv(vec2 tile, vec2 u0, vec2 k, float zr, float lod) {
 	vec2 grid = vec2(float(impostor_cols), float(impostor_rows));
 	vec2 u = u0;
-	if (depth_range > 0.0) {
+	if (depth_range > 0.0 && zr > 0.0) {
 		vec2 d = textureLod(impostor_depth, (tile + clamp(vec2(u0.x, 1.0 - u0.y), 0.002, 0.998)) / grid,
 			max(lod, 0.0) + depth_blur_lod).rg;
 		float z = d.y > 0.03 ? clamp((d.x / d.y - 0.5) * depth_range, -zr, zr) : 0.0;
@@ -637,8 +660,9 @@ void fragment() {
 		vec2 tuv0 = clamp(vec2(fuv_a.x, 1.0 - fuv_a.y), 0.002, 0.998);
 		float lod0 = textureQueryLod(impostor_albedo, (tile_a + tuv0) / grid).y;
 		vec3 ua = frame_uv(tile_a, fuv_a, fk_ab.xy, fzr.x, lod0);
-		vec3 ub = frame_uv(tile_b, fuv_b, fk_ab.zw, fzr.y, lod0);
-		vec3 uc = frame_uv(tile_c, fuv_c, fk_c, fzr.z, lod0);
+		// A frame of no weight is not read at all (blend_min_px, the grid's exact frames).
+		vec3 ub = tile_w.y > 0.0 ? frame_uv(tile_b, fuv_b, fk_ab.zw, fzr.y, lod0) : vec3(0.0);
+		vec3 uc = tile_w.z > 0.0 ? frame_uv(tile_c, fuv_c, fk_c, fzr.z, lod0) : vec3(0.0);
 		vec2 ga_x = dFdx(vec2(fuv_a.x, -fuv_a.y)) / grid;
 		vec2 ga_y = dFdy(vec2(fuv_a.x, -fuv_a.y)) / grid;
 		vec2 gb_x = dFdx(vec2(fuv_b.x, -fuv_b.y)) / grid;
@@ -648,8 +672,8 @@ void fragment() {
 		// A frame whose hit is off its tile has nothing there.
 		vec3 fw = tile_w * vec3(ua.z, ub.z, uc.z);
 		vec4 pa = textureGrad(impostor_albedo, ua.xy, ga_x, ga_y);
-		vec4 pb = textureGrad(impostor_albedo, ub.xy, gb_x, gb_y);
-		vec4 pc = textureGrad(impostor_albedo, uc.xy, gc_x, gc_y);
+		vec4 pb = fw.y > 0.0 ? textureGrad(impostor_albedo, ub.xy, gb_x, gb_y) : vec4(0.0);
+		vec4 pc = fw.z > 0.0 ? textureGrad(impostor_albedo, uc.xy, gc_x, gc_y) : vec4(0.0);
 		vec4 pm = pa * fw.x + pb * fw.y + pc * fw.z;
 		a = pm.a;
 		if (a < 0.004) discard;
@@ -660,8 +684,8 @@ void fragment() {
 #endif
 		a *= 1.0 + max(lod0, 0.0) * alpha_mip_scale;
 		vec4 na = textureGrad(impostor_normal, ua.xy, ga_x, ga_y);
-		vec4 nb = textureGrad(impostor_normal, ub.xy, gb_x, gb_y);
-		vec4 nc = textureGrad(impostor_normal, uc.xy, gc_x, gc_y);
+		vec4 nb = fw.y > 0.0 ? textureGrad(impostor_normal, ub.xy, gb_x, gb_y) : vec4(0.0);
+		vec4 nc = fw.z > 0.0 ? textureGrad(impostor_normal, uc.xy, gc_x, gc_y) : vec4(0.0);
 		float wa = fw.x * na.a;
 		float wb = fw.y * nb.a;
 		float wc = fw.z * nc.a;

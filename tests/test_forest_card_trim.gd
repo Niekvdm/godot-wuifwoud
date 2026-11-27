@@ -4,7 +4,8 @@ extends RefCounted
 ## The trimmed impostor card. The bake measures, per view and per mip set, the vertical reach of the silhouette and the
 ## horizontal reach of each of TRIM_BANDS bands (ForestImpostorBaker.trim_of); the measurement is CONSERVATIVE: every
 ## texel of a mip the set covers that can pass the card's cut lies inside its band's reach. ring_at reads the trim sheet,
-## and card_of builds the band strip and hands the shader the sheet and its layout; a ring without one keeps the quad.
+## and card_of hands the shader the sheet and its layout on the plain quad (its corners pulled in per view); a ring
+## without one leaves trimming off.
 ##
 ## Run with a unit-suite runner: static run() returns {name, passed, failed, details}.
 
@@ -132,7 +133,7 @@ static func run() -> Dictionary:
 				miss = _escapes(dec, trim, m, s)
 	_chk(r, "every texel the cut keeps lies inside its band's reach, every set, every mip it covers %s" % miss, miss == "")
 
-	# ── ring_at reads the trim sheet; card_of builds the strip ──
+	# ── ring_at reads the trim sheet; card_of hands it to the quad ──
 	TreeFix.rm_tree(ROOT)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(ROOT))
 	var sheet := Image.create_empty(16, 16, false, Image.FORMAT_RGBA8)
@@ -155,24 +156,10 @@ static func run() -> Dictionary:
 
 	var p := {"aabb": AABB(Vector3(-3, 0, -3), Vector3(6, 12, 6))}
 	var card := VA.card_of("W_T", null, p, ring, 0)
-	var mesh := card["mesh"] as ArrayMesh
 	var mat := card["mat"] as ShaderMaterial
-	_chk(r, "card_of on a trimmed ring builds the band strip", mesh != null and mesh.get_surface_count() == 1)
-	if mesh != null:
-		var arr := mesh.surface_get_arrays(0)
-		var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
-		var uvs: PackedVector2Array = arr[Mesh.ARRAY_TEX_UV]
-		var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX]
-		_chk(r, "two vertices a row, two triangles a band (%d, %d)" % [verts.size(), idx.size()],
-			verts.size() == 2 * (k + 1) and idx.size() == 6 * k)
-		# Untrimmed it is the plain quad: the bake's square, corners where the QuadMesh has them, UV v top→bottom.
-		var square := true
-		for i in verts.size():
-			var want := Vector2((uvs[i].x - 0.5) * 12.5, (0.5 - uvs[i].y) * 12.5)
-			if not Vector2(verts[i].x, verts[i].y).is_equal_approx(want):
-				square = false
-		_chk(r, "untrimmed, the strip is the bake's square", square
-			and Vector2(mesh.get_aabb().size.x, mesh.get_aabb().size.y).is_equal_approx(Vector2(12.5, 12.5)))
+	# A QUAD: the band strip cost 2x the quad's GPU time on a card field at in-game sizes (tree_billboard `trim_sil`).
+	_chk(r, "card_of on a trimmed ring keeps the quad, the bake's square",
+		card["mesh"] is QuadMesh and (card["mesh"] as QuadMesh).size == Vector2(12.5, 12.5))
 	_chk(r, "the card tells the shader the sheet, its layout and the square",
 		mat.get_shader_parameter("impostor_trim") == ring["trim"] and int(mat.get_shader_parameter("trim_bands")) == k
 		and int(mat.get_shader_parameter("trim_sets")) == sets and is_equal_approx(float(mat.get_shader_parameter("card_span")), 12.5)
